@@ -2,17 +2,19 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 import streamlit as st
+import os
+
+# Definir la ruta del archivo Parquet
+file_path = 'DatosParquet_reducido.parquet'  # Cambiado a ruta relativa
 
 # Configuración de estilo
 st.set_page_config(page_title="Dashboard de Puntajes y Estratos", layout="wide")
 st.title('Dashboard de Puntajes y Estratos por Departamento')
 
-# Cargar archivo usando file_uploader
-uploaded_file = st.file_uploader("Elige un archivo Parquet", type="parquet")
-
-if uploaded_file is not None:
+# Verificar si el archivo Parquet existe
+if os.path.exists(file_path):
     # Cargar el archivo Parquet
-    df = pd.read_parquet(uploaded_file)
+    df = pd.read_parquet(file_path)
 
     # Filtrar los datos eliminando valores nulos en 'ESTU_DEPTO_RESIDE'
     df_filtrado = df.dropna(subset=['ESTU_DEPTO_RESIDE'])
@@ -60,7 +62,6 @@ if uploaded_file is not None:
             plt.xlabel('Departamento', fontsize=14)
             plt.ylabel(f'Media de {selected_puntaje}', fontsize=14)
             plt.xticks(rotation=90)
-            bar_plot.set(ylim=(0, df_filtrado_puntaje[selected_puntaje].max() + 5))  # Ajustar el límite superior
             for p in bar_plot.patches:
                 bar_plot.annotate(f'{p.get_height():.1f}', (p.get_x() + p.get_width() / 2., p.get_height()), ha='center', va='bottom', fontsize=8, color='black')
             st.pyplot(plt)
@@ -79,7 +80,6 @@ if uploaded_file is not None:
             plt.xlabel('Departamento', fontsize=14)
             plt.ylabel('Media del Estrato de Vivienda', fontsize=14)
             plt.xticks(rotation=90)
-            bar_plot_estrato.set(ylim=(0, df_filtrado_estrato['FAMI_ESTRATOVIVIENDA'].max() + 1))  # Ajustar el límite superior
             for p in bar_plot_estrato.patches:
                 bar_plot_estrato.annotate(f'{p.get_height():.1f}', (p.get_x() + p.get_width() / 2., p.get_height()), ha='center', va='bottom', fontsize=8, color='black')
             st.pyplot(plt)
@@ -110,5 +110,6 @@ if uploaded_file is not None:
         plt.close()
     else:
         st.warning("No hay datos suficientes para mostrar el gráfico de relación entre puntaje, estrato y departamento.")
+
 else:
-    st.warning("Por favor, sube un archivo Parquet.")
+    st.error('El archivo Parquet no fue encontrado en la ruta especificada.')
