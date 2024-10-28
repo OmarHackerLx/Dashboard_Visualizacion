@@ -2,19 +2,17 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 import streamlit as st
-import os
 
-# Definir la ruta del archivo Parquet reducido
-file_path = r'C:\Users\omarv\Desktop\Visualizacion\PIF\DatosParquet_reducido.parquet'
-
-# Configuración de estilo del dashboard
+# Configuración de estilo
 st.set_page_config(page_title="Dashboard de Puntajes y Estratos", layout="wide")
 st.title('Dashboard de Puntajes y Estratos por Departamento')
 
-# Verificar si el archivo Parquet existe
-if os.path.exists(file_path):
+# Cargar archivo usando file_uploader
+uploaded_file = st.file_uploader("Elige un archivo Parquet", type="parquet")
+
+if uploaded_file is not None:
     # Cargar el archivo Parquet
-    df = pd.read_parquet(file_path)
+    df = pd.read_parquet(uploaded_file)
 
     # Filtrar los datos eliminando valores nulos en 'ESTU_DEPTO_RESIDE'
     df_filtrado = df.dropna(subset=['ESTU_DEPTO_RESIDE'])
@@ -51,53 +49,53 @@ if os.path.exists(file_path):
     # Dashboard: Gráficos organizados en columnas
     col1, col2 = st.columns(2)
 
-    # Gráfico de puntajes (orientación vertical)
+    # Gráfico de puntajes
     with col1:
         st.subheader(f'Media de {selected_puntaje} por Departamento')
         if not df_filtrado_puntaje.empty:
-            plt.figure(figsize=(10, 8))
+            plt.figure(figsize=(12, 6))
             df_filtrado_puntaje = df_filtrado_puntaje.sort_values(by=selected_puntaje)
-            bar_plot = sns.barplot(data=df_filtrado_puntaje, y='ESTU_DEPTO_RESIDE', x=selected_puntaje, palette='viridis')
+            bar_plot = sns.barplot(data=df_filtrado_puntaje, x='ESTU_DEPTO_RESIDE', y=selected_puntaje, palette='viridis')
             plt.title(f'Media del {selected_puntaje} por Departamento', fontsize=16)
-            plt.ylabel('Departamento', fontsize=14)
-            plt.xlabel(f'Media de {selected_puntaje}', fontsize=14)
-            plt.xticks(rotation=0)
+            plt.xlabel('Departamento', fontsize=14)
+            plt.ylabel(f'Media de {selected_puntaje}', fontsize=14)
+            plt.xticks(rotation=90)
+            bar_plot.set(ylim=(0, df_filtrado_puntaje[selected_puntaje].max() + 5))  # Ajustar el límite superior
             for p in bar_plot.patches:
-                bar_plot.annotate(f'{p.get_width():.1f}', (p.get_width(), p.get_y() + p.get_height() / 2.), 
-                                  ha='center', va='center', fontsize=8, color='black')
+                bar_plot.annotate(f'{p.get_height():.1f}', (p.get_x() + p.get_width() / 2., p.get_height()), ha='center', va='bottom', fontsize=8, color='black')
             st.pyplot(plt)
             plt.close()
         else:
             st.warning("No hay departamentos seleccionados para mostrar el gráfico de puntajes.")
 
-    # Gráfico de estratos (orientación vertical)
+    # Gráfico de estratos
     with col2:
         st.subheader('Media de FAMI_ESTRATOVIVIENDA por Departamento')
         if not df_filtrado_estrato.empty:
-            plt.figure(figsize=(10, 8))
+            plt.figure(figsize=(12, 6))
             df_filtrado_estrato = df_filtrado_estrato.sort_values(by='FAMI_ESTRATOVIVIENDA')
-            bar_plot_estrato = sns.barplot(data=df_filtrado_estrato, y='ESTU_DEPTO_RESIDE', x='FAMI_ESTRATOVIVIENDA', palette='coolwarm')
+            bar_plot_estrato = sns.barplot(data=df_filtrado_estrato, x='ESTU_DEPTO_RESIDE', y='FAMI_ESTRATOVIVIENDA', palette='coolwarm')
             plt.title('Media del Estrato de Vivienda por Departamento', fontsize=16)
-            plt.ylabel('Departamento', fontsize=14)
-            plt.xlabel('Media del Estrato de Vivienda', fontsize=14)
-            plt.xticks(rotation=0)
+            plt.xlabel('Departamento', fontsize=14)
+            plt.ylabel('Media del Estrato de Vivienda', fontsize=14)
+            plt.xticks(rotation=90)
+            bar_plot_estrato.set(ylim=(0, df_filtrado_estrato['FAMI_ESTRATOVIVIENDA'].max() + 1))  # Ajustar el límite superior
             for p in bar_plot_estrato.patches:
-                bar_plot_estrato.annotate(f'{p.get_width():.1f}', (p.get_width(), p.get_y() + p.get_height() / 2.), 
-                                          ha='center', va='center', fontsize=8, color='black')
+                bar_plot_estrato.annotate(f'{p.get_height():.1f}', (p.get_x() + p.get_width() / 2., p.get_height()), ha='center', va='bottom', fontsize=8, color='black')
             st.pyplot(plt)
             plt.close()
         else:
             st.warning("No hay datos disponibles para los departamentos seleccionados en el gráfico de estratos.")
 
-    # Gráfico de burbujas
+    # Fila completa para gráfico de burbujas
     st.subheader(f'Relación entre {selected_puntaje}, Estrato y Departamento')
     if not df_filtrado_puntaje.empty and not df_filtrado_estrato.empty:
         df_combined = pd.merge(df_filtrado_puntaje, df_filtrado_estrato, on='ESTU_DEPTO_RESIDE')
-        plt.figure(figsize=(12, 8))
+        plt.figure(figsize=(14, 8))
         scatter_plot = sns.scatterplot(
             data=df_combined, 
-            y='ESTU_DEPTO_RESIDE', 
-            x=selected_puntaje, 
+            x='ESTU_DEPTO_RESIDE', 
+            y=selected_puntaje, 
             size='FAMI_ESTRATOVIVIENDA', 
             sizes=(20, 200), 
             hue='FAMI_ESTRATOVIVIENDA', 
@@ -105,13 +103,12 @@ if os.path.exists(file_path):
             legend="brief"
         )
         plt.title(f'Relación entre {selected_puntaje}, Estrato de Vivienda y Departamento', fontsize=16)
-        plt.ylabel('Departamento', fontsize=14)
-        plt.xlabel(f'Media de {selected_puntaje}', fontsize=14)
-        plt.xticks(rotation=0)
+        plt.xlabel('Departamento', fontsize=14)
+        plt.ylabel(f'Media de {selected_puntaje}', fontsize=14)
+        plt.xticks(rotation=90)
         st.pyplot(plt)
         plt.close()
     else:
         st.warning("No hay datos suficientes para mostrar el gráfico de relación entre puntaje, estrato y departamento.")
-
 else:
-    st.error('El archivo Parquet no fue encontrado en la ruta especificada.')
+    st.warning("Por favor, sube un archivo Parquet.")
