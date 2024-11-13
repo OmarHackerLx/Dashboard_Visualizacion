@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import streamlit as st
 import os
 import folium
-from folium.plugins import HeatMap
+from streamlit_folium import folium_static
 
 # Definir la ruta del archivo Parquet
 file_path = 'DatosParquet_reducido.parquet'  # Cambiado a ruta relativa
@@ -113,64 +113,27 @@ if os.path.exists(file_path):
     else:
         st.warning("No hay datos suficientes para mostrar el gráfico de relación entre puntaje, estrato y departamento.")
 
-    # Agregar el mapa interactivo de folium
-    st.subheader("Mapa Interactivo de Puntajes por Departamento")
+    # Mapa con Folium
+    st.subheader('Mapa Interactivo de los Departamentos')
+    df_folium = pd.DataFrame({
+        'departamento': ['ANTIOQUIA', 'ATLÁNTICO', 'BOGOTÁ, D.C.', 'BOLÍVAR'],
+        'lat': [6.702032125, 10.67700953, 4.316107698, 8.079796863],
+        'lon': [-75.50455704, -74.96521949, -74.1810727, -74.23514814],
+        'valor': [50, 60, 70, 40]
+    })
+    m = folium.Map(location=[4.5709, -74.2973], zoom_start=6)
+    min_value = df_folium['valor'].min()
+    max_value = df_folium['valor'].max()
+    color_scale = folium.LinearColormap(['blue', 'green', 'yellow', 'orange', 'red'], vmin=min_value, vmax=max_value)
 
-    # Diccionario de coordenadas de departamentos
-    departamentos_coords = {
-        "Amazonas": [-3.4653, -70.6513],
-        "Antioquia": [6.4971, -75.3604],
-        "Atlántico": [10.4218, -74.2116],
-        "Bogotá": [4.6097, -74.0817],
-        "Bolívar": [10.3910, -75.4794],
-        "Boyacá": [5.5545, -73.3626],
-        "Caldas": [5.0621, -75.5386],
-        "Caquetá": [1.6111, -75.6167],
-        "Casanare": [5.8590, -72.5225],
-        "Cauca": [2.4967, -76.6052],
-        "Cesar": [10.4630, -74.2792],
-        "Chocó": [5.6915, -77.2035],
-        "Córdoba": [8.7494, -75.8810],
-        "Cundinamarca": [4.3457, -74.4582],
-        "Guainía": [3.8750, -67.6699],
-        "Guaviare": [3.0492, -71.5956],
-        "Huila": [2.9166, -75.3703],
-        "La Guajira": [11.5515, -71.7168],
-        "Magdalena": [10.4775, -74.2199],
-        "Meta": [4.0926, -73.7033],
-        "Nariño": [1.2095, -77.2684],
-        "Norte de Santander": [7.9305, -72.5071],
-        "Putumayo": [1.3754, -76.6141],
-        "Quindío": [4.5352, -75.6814],
-        "Risaralda": [5.2637, -75.6042],
-        "San Andrés y Providencia": [12.5800, -81.7117],
-        "Santander": [7.6775, -73.1072],
-        "Sucre": [9.2911, -75.4028],
-        "Tolima": [4.0914, -75.2096],
-        "Valle del Cauca": [3.4680, -76.5305],
-        "Vaupés": [0.7405, -70.4971],
-        "Vichada": [4.8673, -69.1814]
-    }
+    for i, row in df_folium.iterrows():
+        folium.Marker(
+            location=[row['lat'], row['lon']],
+            popup=f"{row['departamento']}: {row['valor']}",
+            icon=folium.Icon(color=color_scale(row['valor']), icon_color=color_scale(row['valor']), icon='info-sign')
+        ).add_to(m)
 
-    # Crear el mapa de folium centrado en Colombia
-    m = folium.Map(location=[4.5709, -74.2973], zoom_start=5)
-
-    # Agregar puntos al mapa
-    for depto in selected_departamentos:
-        if depto in departamentos_coords:
-            lat, lon = departamentos_coords[depto]
-            folium.CircleMarker(
-                location=[lat, lon],
-                radius=8,
-                color='blue',
-                fill=True,
-                fill_color='blue',
-                fill_opacity=0.6,
-                popup=f'{depto}: {df_filtrado_puntaje[df_filtrado_puntaje["ESTU_DEPTO_RESIDE"] == depto][selected_puntaje].mean():.2f}'
-            ).add_to(m)
-
-    # Mostrar el mapa
-    st.subheader("Mapa de Puntajes por Departamento")
+    color_scale.add_to(m)
     folium_static(m)
 
 else:
