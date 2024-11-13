@@ -52,6 +52,35 @@ if os.path.exists(file_path):
     df_filtrado_puntaje = df_agrupado_puntajes[df_agrupado_puntajes['ESTU_DEPTO_RESIDE'].isin(selected_departamentos)]
     df_filtrado_estrato = df_agrupado_estrato[df_agrupado_estrato['ESTU_DEPTO_RESIDE'].isin(selected_departamentos)]
 
+    # Coordenadas de los departamentos
+    coordenadas = {
+        'departamento': [
+            'ANTIOQUIA', 'ATLÁNTICO', 'BOGOTÁ, D.C.', 'BOLÍVAR', 'BOYACÁ', 'CALDAS', 'CAQUETÁ', 'CAUCA', 'CESAR',
+            'CÓRDOBA', 'CUNDINAMARCA', 'CHOCÓ', 'HUILA', 'LA GUAJIRA', 'MAGDALENA', 'META', 'NARIÑO', 'NORTE DE SANTANDER',
+            'QUINDÍO', 'RISARALDA', 'SANTANDER', 'SUCRE', 'TOLIMA', 'VALLE DEL CAUCA', 'ARAUCA', 'CASANARE', 'PUTUMAYO',
+            'SAN ANDRÉS', 'AMAZONAS', 'GUAINÍA', 'GUAVIARE', 'VAUPÉS', 'VICHADA'
+        ],
+        'lat': [
+            6.702032125, 10.67700953, 4.316107698, 8.079796863, 5.891672889, 5.280139978, 0.798556195, 2.396833887,
+            9.53665993, 8.358549754, 4.771120716, 5.397581542, 2.570143029, 11.47687008, 10.24738355, 3.345562732,
+            1.571094987, 8.09513751, 4.455241567, 5.240757239, 6.693633184, 9.064941448, 4.03477252, 3.569858693,
+            6.569577215, 5.404064237, 0.3673031, 12.54311512, -1.54622768, 2.727842865, 1.924531973, 0.64624561, 4.713557125
+        ],
+        'lon': [
+            -75.50455704, -74.96521949, -74.1810727, -74.23514814, -72.62788054, -75.27498304, -73.95946756, -76.82423283,
+            -73.51783154, -75.79200872, -74.43111092, -76.942811, -75.58434836, -72.42951072, -74.26175733, -72.95645988,
+            -77.87020496, -72.88188297, -75.68962853, -76.00244469, -73.48600894, -75.10981755, -75.2558271, -76.62850427,
+            -70.96732394, -71.60188073, -75.51406183, -81.71762382, -71.50212858, -68.81661272, -72.12859569, -70.56140566,
+            -69.41400011
+        ]
+    }
+
+    # Crear DataFrame de coordenadas
+    df_coordenadas = pd.DataFrame(coordenadas)
+
+    # Unir el DataFrame de puntajes con las coordenadas
+    df_filtrado_puntaje = pd.merge(df_filtrado_puntaje, df_coordenadas, left_on='ESTU_DEPTO_RESIDE', right_on='departamento')
+
     # Dashboard: Gráficos organizados en columnas
     col1, col2 = st.columns(2)
 
@@ -89,45 +118,10 @@ if os.path.exists(file_path):
             st.pyplot(plt)
             plt.close()
         else:
-            st.warning("No hay datos disponibles para los departamentos seleccionados en el gráfico de estratos.")
-
-    # Fila completa para gráfico de burbujas
-    st.subheader(f'Relación entre {selected_puntaje}, Estrato y Departamento')
-    if not df_filtrado_puntaje.empty and not df_filtrado_estrato.empty:
-        df_combined = pd.merge(df_filtrado_puntaje, df_filtrado_estrato, on='ESTU_DEPTO_RESIDE')
-        plt.figure(figsize=(14, 8))
-        scatter_plot = sns.scatterplot(
-            data=df_combined, 
-            y='ESTU_DEPTO_RESIDE', 
-            x=selected_puntaje, 
-            size='FAMI_ESTRATOVIVIENDA', 
-            sizes=(20, 200), 
-            hue='FAMI_ESTRATOVIVIENDA', 
-            palette='coolwarm', 
-            legend="brief"
-        )
-        plt.title(f'Relación entre {selected_puntaje}, Estrato de Vivienda y Departamento', fontsize=16)
-        plt.ylabel('Departamento', fontsize=14)
-        plt.xlabel(f'Media de {selected_puntaje}', fontsize=14)
-        plt.xticks(rotation=0)
-        st.pyplot(plt)
-        plt.close()
-    else:
-        st.warning("No hay datos suficientes para mostrar el gráfico de relación entre puntaje, estrato y departamento.")
+            st.warning("No hay departamentos seleccionados para mostrar el gráfico de estratos.")
 
     # Mapa con Folium
     st.subheader('Mapa Interactivo de los Departamentos')
-
-    # Datos de los departamentos con latitudes y longitudes
-    latitudes = [6.702032125, 10.67700953, 4.316107698, 8.079796863, 5.891672889, 5.280139978, 0.798556195, 2.396833887,
-                 9.53665993, 8.358549754, 4.771120716, 5.397581542, 2.570143029, 11.47687008, 10.24738355, 3.345562732,
-                 1.571094987, 8.09513751, 4.455241567, 5.240757239, 6.693633184, 9.064941448, 4.03477252, 3.569858693,
-                 6.569577215, 5.404064237, 0.3673031, 12.54311512, -1.54622768, 2.727842865, 1.924531973, 0.636634748]
-    longitudes = [-75.70126393, -74.99083812, -74.08314411, -75.56359151, -73.3098892, -75.65086642, -75.88069712,
-                  -76.61891398, -73.71933693, -73.98701565, -74.31816735, -76.59874151, -76.36552059, -71.94553734,
-                  -74.18925577, -75.70624244, -75.82426118, -76.41674889, -73.9874089, -74.7303148, -74.22784072,
-                  -73.77567029, -73.63687504, -77.28175432, -75.25772519, -75.60702991, -75.23616327, -77.03924974,
-                  -75.72677245, -75.08436212]
 
     # Mapa base
     m = folium.Map(location=[4.570868, -74.297333], zoom_start=5)
@@ -138,21 +132,12 @@ if os.path.exists(file_path):
     color_scale = folium.LinearColormap(['blue', 'green', 'yellow', 'orange', 'red'], vmin=min_value, vmax=max_value)
 
     # Agregar los marcadores con colores basados en el puntaje
-    for departamento, lat, lon in zip(departamentos, latitudes, longitudes):
-        puntaje = df_filtrado_puntaje.loc[df_filtrado_puntaje['ESTU_DEPTO_RESIDE'] == departamento, selected_puntaje]
-        if not puntaje.empty:
-            popup_text = f'{departamento}: {selected_puntaje} = {puntaje.values[0]}'
-            icon_color = color_scale(puntaje.values[0])  # Obtener el color basado en el puntaje
-        else:
-            popup_text = f'{departamento}: {selected_puntaje} no disponible'
-            icon_color = 'blue'  # Color por defecto si no hay puntaje
-        
-        if departamento in selected_departamentos:
-            folium.Marker(
-                location=[lat, lon],
-                popup=popup_text,
-                icon=folium.Icon(color=icon_color, icon_color=icon_color, icon='info-sign')
-            ).add_to(m)
+    for _, row in df_filtrado_puntaje.iterrows():
+        folium.Marker(
+            location=[row['lat'], row['lon']],
+            popup=f"{row['departamento']}: {selected_puntaje} = {row[selected_puntaje]:.1f}",
+            icon=folium.Icon(color=color_scale(row[selected_puntaje]), icon_color="white", icon='info-sign')
+        ).add_to(m)
 
     # Agregar la leyenda del mapa
     color_scale.add_to(m)
