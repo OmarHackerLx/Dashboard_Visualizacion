@@ -115,26 +115,28 @@ if os.path.exists(file_path):
 
     # Mapa con Folium
     st.subheader('Mapa Interactivo de los Departamentos')
-    df_folium = pd.DataFrame({
-        'departamento': ['ANTIOQUIA', 'ATLÁNTICO', 'BOGOTÁ, D.C.', 'BOLÍVAR'],
-        'lat': [6.702032125, 10.67700953, 4.316107698, 8.079796863],
-        'lon': [-75.50455704, -74.96521949, -74.1810727, -74.23514814],
-        'valor': [50, 60, 70, 40]
+    df_departamentos = pd.DataFrame({
+        'departamento': ['ANTIOQUIA', 'ATLÁNTICO', 'BOGOTÁ, D.C.', 'BOLÍVAR', 'BOYACÁ', 'CALDAS', 'CAQUETÁ', 'CAUCA', 'CESAR',
+                         'CÓRDOBA', 'CUNDINAMARCA', 'CHOCÓ', 'HUILA', 'LA GUAJIRA', 'MAGDALENA', 'META', 'NARIÑO', 'NORTE DE SANTANDER',
+                         'QUINDÍO', 'RISARALDA', 'SANTANDER', 'SUCRE', 'TOLIMA', 'VALLE DEL CAUCA', 'ARAUCA', 'CASANARE', 'PUTUMAYO',
+                         'ARCHIPIÉLAGO DE SAN ANDRÉS, PROVIDENCIA Y SANTA CATALINA', 'AMAZONAS', 'GUAINÍA', 'GUAVIARE', 'VAUPÉS', 'VICHADA'],
+        'lat': [6.702032125, 10.67700953, 4.316107698, 8.079796863, 5.891672889, 5.280139978, 0.798556195, 2.396833887,
+                9.53665993, 8.358549754, 4.771120716, 5.397581542, 2.570143029, 11.47687008, 10.24738355, 3.345562732,
+                1.571094987, 8.09513751, 4.455241567, 5.240757239, 6.693633184, 9.064941448, 4.03477252, 3.569858693,
+                6.569577215, 5.404064237, 0.3673031, 12.54311512, -1.54622768, 2.727842865, 1.924531973, 0.636634748],
+        'lon': [-75.70126393, -74.99083812, -74.08314411, -75.56359151, -73.3098892, -75.65086642, -75.88069712,
+                -76.61891398, -73.71933693, -73.98701565, -74.31816735, -76.59874151, -76.36552059, -71.94553734,
+                -74.18925577, -75.49758114, -73.88174804, -77.13996262, -72.9946198, -74.01301523, -74.10234115,
+                -74.01650449, -75.08012079, -73.30850847, -76.60725149, -75.76277267, -70.62495717, -74.22350052,
+                -75.24183943, -73.49826767, -72.49750711, -69.5161272, -69.92474764]
     })
-    m = folium.Map(location=[4.5709, -74.2973], zoom_start=6)
-    min_value = df_folium['valor'].min()
-    max_value = df_folium['valor'].max()
-    color_scale = folium.LinearColormap(['blue', 'green', 'yellow', 'orange', 'red'], vmin=min_value, vmax=max_value)
 
-    for i, row in df_folium.iterrows():
-        folium.Marker(
-            location=[row['lat'], row['lon']],
-            popup=f"{row['departamento']}: {row['valor']}",
-            icon=folium.Icon(color=color_scale(row['valor']), icon_color=color_scale(row['valor']), icon='info-sign')
-        ).add_to(m)
+    m = folium.Map(location=[4.570868, -74.297333], zoom_start=5, control_scale=True)
 
-    color_scale.add_to(m)
+    for i in df_departamentos.iterrows():
+        folium.Marker([i[1]['lat'], i[1]['lon']], popup=f"<b>{i[1]['departamento']}</b>").add_to(m)
+
     folium_static(m)
 
 else:
-    st.error('El archivo Parquet no fue encontrado en la ruta especificada.')
+    st.error("El archivo de datos no existe.")
