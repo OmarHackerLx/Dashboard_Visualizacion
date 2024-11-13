@@ -6,3 +6,9 @@ pyarrow  # Si estás usando Parquet
 geopandas
 folium
 streamlit-folium
+pandas
+seaborn
+matplotlib
+streamlit
+folium
+streamlit-folium
