@@ -12,3 +12,8 @@ matplotlib
 streamlit
 folium
 streamlit-folium
+streamlit
+pandas
+folium
+seaborn
+matplotlib
