@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 import streamlit as st
 import os
 import folium
-from folium.plugins import MarkerCluster
 from streamlit_folium import folium_static
 
 # Definir la ruta del archivo Parquet
@@ -131,8 +130,7 @@ if os.path.exists(file_path):
     # Mapa base
     m = folium.Map(location=[4.570868, -74.297333], zoom_start=5)
 
-    # Agregar los marcadores con el nombre y puntaje
-    marker_cluster = MarkerCluster().add_to(m)
+    # Agregar los marcadores sin agrupación
     for departamento, lat, lon in zip(departamentos, latitudes, longitudes):
         # Verificar si el puntaje seleccionado existe para el departamento
         puntaje = df_filtrado_puntaje.loc[df_filtrado_puntaje['ESTU_DEPTO_RESIDE'] == departamento, selected_puntaje]
@@ -145,7 +143,7 @@ if os.path.exists(file_path):
             folium.Marker(
                 location=[lat, lon],
                 popup=popup_text,
-            ).add_to(marker_cluster)
+            ).add_to(m)
 
     folium_static(m)
 
