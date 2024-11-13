@@ -3,12 +3,12 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import streamlit as st
 import os
-import geopandas as gpd
 import folium
 from streamlit_folium import st_folium
 
-# Definir la ruta del archivo Parquet
+# Definir la ruta del archivo Parquet y el archivo GeoJSON
 file_path = 'DatosParquet_reducido.parquet'  # Cambiado a ruta relativa
+col_geojson_path = 'colombia_departamentos.geojson'  # Ruta del archivo GeoJSON de Colombia
 
 # Configuración de estilo
 st.set_page_config(page_title="Dashboard de Puntajes y Estratos", layout="wide")
@@ -90,59 +90,23 @@ if os.path.exists(file_path):
         else:
             st.warning("No hay datos disponibles para los departamentos seleccionados en el gráfico de estratos.")
 
-    # Fila completa para gráfico de burbujas
-    st.subheader(f'Relación entre {selected_puntaje}, Estrato y Departamento')
-    if not df_filtrado_puntaje.empty and not df_filtrado_estrato.empty:
-        df_combined = pd.merge(df_filtrado_puntaje, df_filtrado_estrato, on='ESTU_DEPTO_RESIDE')
-        plt.figure(figsize=(14, 8))
-        scatter_plot = sns.scatterplot(
-            data=df_combined, 
-            y='ESTU_DEPTO_RESIDE', 
-            x=selected_puntaje, 
-            size='FAMI_ESTRATOVIVIENDA', 
-            sizes=(20, 200), 
-            hue='FAMI_ESTRATOVIVIENDA', 
-            palette='coolwarm', 
-            legend="brief"
-        )
-        plt.title(f'Relación entre {selected_puntaje}, Estrato de Vivienda y Departamento', fontsize=16)
-        plt.ylabel('Departamento', fontsize=14)
-        plt.xlabel(f'Media de {selected_puntaje}', fontsize=14)
-        plt.xticks(rotation=0)
-        st.pyplot(plt)
-        plt.close()
-    else:
-        st.warning("No hay datos suficientes para mostrar el gráfico de relación entre puntaje, estrato y departamento.")
-
-    # Mapa de calor de Colombia
-    st.subheader(f'Mapa de Calor del Puntaje de {selected_puntaje} por Departamento')
-    # Cargar el shapefile de Colombia
-    col_shapefile_path = 'colombia_departamentos.shp'  # Asegúrate de tener el shapefile en esta ubicación
-    if os.path.exists(col_shapefile_path):
-        colombia_map = gpd.read_file(col_shapefile_path)
-
-        # Unir el shapefile con los puntajes por departamento
-        colombia_map = colombia_map.merge(df_filtrado_puntaje, left_on="NOMBRE_DPT", right_on="ESTU_DEPTO_RESIDE", how="left")
-
-        # Crear el mapa base de Colombia
+    # Gráfico del mapa de calor basado en el puntaje seleccionado
+    st.subheader(f'Mapa de calor de {selected_puntaje} por Departamento')
+    if os.path.exists(col_geojson_path):
+        # Crear el mapa de calor
         m = folium.Map(location=[4.5709, -74.2973], zoom_start=5)
-
-        # Añadir capas de calor con colores
         folium.Choropleth(
-            geo_data=colombia_map,
-            data=colombia_map,
-            columns=["NOMBRE_DPT", selected_puntaje],
-            key_on="feature.properties.NOMBRE_DPT",
+            geo_data=col_geojson_path,
+            data=df_filtrado_puntaje,
+            columns=["ESTU_DEPTO_RESIDE", selected_puntaje],
+            key_on="feature.properties.NOMBRE_DPT",  # Asegúrate de que coincida con el campo en tu GeoJSON
             fill_color="RdYlBu_r",
             fill_opacity=0.7,
             line_opacity=0.2,
             legend_name=f"Media de {selected_puntaje} por Departamento"
         ).add_to(m)
-
-        # Mostrar el mapa en Streamlit
         st_folium(m, width=700, height=500)
     else:
-        st.error("Archivo shapefile de Colombia no encontrado. Asegúrate de que esté disponible en la ruta especificada.")
-
+        st.error("Archivo GeoJSON de Colombia no encontrado. Asegúrate de que esté disponible en la ruta especificada.")
 else:
     st.error('El archivo Parquet no fue encontrado en la ruta especificada.')
