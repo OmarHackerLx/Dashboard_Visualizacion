@@ -3,6 +3,9 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import streamlit as st
 import os
+import geopandas as gpd
+import folium
+from streamlit_folium import st_folium
 
 # Definir la ruta del archivo Parquet
 file_path = 'DatosParquet_reducido.parquet'  # Cambiado a ruta relativa
@@ -110,6 +113,36 @@ if os.path.exists(file_path):
         plt.close()
     else:
         st.warning("No hay datos suficientes para mostrar el gráfico de relación entre puntaje, estrato y departamento.")
+
+    # Mapa de calor de Colombia
+    st.subheader(f'Mapa de Calor del Puntaje de {selected_puntaje} por Departamento')
+    # Cargar el shapefile de Colombia
+    col_shapefile_path = 'colombia_departamentos.shp'  # Asegúrate de tener el shapefile en esta ubicación
+    if os.path.exists(col_shapefile_path):
+        colombia_map = gpd.read_file(col_shapefile_path)
+
+        # Unir el shapefile con los puntajes por departamento
+        colombia_map = colombia_map.merge(df_filtrado_puntaje, left_on="NOMBRE_DPT", right_on="ESTU_DEPTO_RESIDE", how="left")
+
+        # Crear el mapa base de Colombia
+        m = folium.Map(location=[4.5709, -74.2973], zoom_start=5)
+
+        # Añadir capas de calor con colores
+        folium.Choropleth(
+            geo_data=colombia_map,
+            data=colombia_map,
+            columns=["NOMBRE_DPT", selected_puntaje],
+            key_on="feature.properties.NOMBRE_DPT",
+            fill_color="RdYlBu_r",
+            fill_opacity=0.7,
+            line_opacity=0.2,
+            legend_name=f"Media de {selected_puntaje} por Departamento"
+        ).add_to(m)
+
+        # Mostrar el mapa en Streamlit
+        st_folium(m, width=700, height=500)
+    else:
+        st.error("Archivo shapefile de Colombia no encontrado. Asegúrate de que esté disponible en la ruta especificada.")
 
 else:
     st.error('El archivo Parquet no fue encontrado en la ruta especificada.')
