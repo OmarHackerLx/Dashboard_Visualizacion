@@ -4,7 +4,9 @@ import matplotlib.pyplot as plt
 import streamlit as st
 import os
 import folium
+from folium import plugins
 from streamlit_folium import folium_static
+import matplotlib.colors as mcolors
 
 # Definir la ruta del archivo Parquet
 file_path = 'DatosParquet_reducido.parquet'  # Cambiado a ruta relativa
@@ -123,12 +125,18 @@ if os.path.exists(file_path):
                  6.569577215, 5.404064237, 0.3673031, 12.54311512, -1.54622768, 2.727842865, 1.924531973, 0.636634748]
     longitudes = [-75.70126393, -74.99083812, -74.08314411, -75.56359151, -73.3098892, -75.65086642, -75.88069712,
                   -76.61891398, -73.71933693, -73.98701565, -74.31816735, -76.59874151, -76.36552059, -71.94553734,
-                  -74.18925577, -75.70624244, -75.82426118, -76.41674889, -73.9874089, -74.7303148, -74.22784072,
-                  -73.77567029, -73.63687504, -77.28175432, -75.25772519, -75.60702991, -75.23616327, -77.03924974,
-                  -75.72677245, -75.08436212]
+                  -74.18925577, -75.70624244, -76.82673906, -75.10373247, -75.25772519, -75.60702991, -75.23616327,
+                  -77.03924974, -75.72677245, -75.08436212]
 
     # Mapa base
     m = folium.Map(location=[4.570868, -74.297333], zoom_start=5)
+
+    # Función para obtener color según el puntaje
+    def get_color(puntaje):
+        norm = mcolors.Normalize(vmin=df_filtrado_puntaje[selected_puntaje].min(), vmax=df_filtrado_puntaje[selected_puntaje].max())
+        cmap = plt.get_cmap("coolwarm")
+        rgba = cmap(norm(puntaje))
+        return mcolors.rgb2hex(rgba[:3])
 
     # Agregar los marcadores sin agrupación
     for departamento, lat, lon in zip(departamentos, latitudes, longitudes):
@@ -136,13 +144,16 @@ if os.path.exists(file_path):
         puntaje = df_filtrado_puntaje.loc[df_filtrado_puntaje['ESTU_DEPTO_RESIDE'] == departamento, selected_puntaje]
         if not puntaje.empty:
             popup_text = f'{departamento}: {selected_puntaje} = {puntaje.values[0]}'
+            icon_color = get_color(puntaje.values[0])  # Obtener el color del ícono según el puntaje
         else:
             popup_text = f'{departamento}: {selected_puntaje} no disponible'
+            icon_color = 'blue'  # Color por defecto si no hay puntaje
         
         if departamento in selected_departamentos:
             folium.Marker(
                 location=[lat, lon],
                 popup=popup_text,
+                icon=folium.Icon(color=icon_color)  # Asignar el color al ícono
             ).add_to(m)
 
     folium_static(m)
