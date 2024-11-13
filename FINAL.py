@@ -125,9 +125,8 @@ if os.path.exists(file_path):
     longitudes = [-75.70126393, -74.99083812, -74.08314411, -75.56359151, -73.3098892, -75.65086642, -75.88069712,
                   -76.61891398, -73.71933693, -73.98701565, -74.31816735, -76.59874151, -76.36552059, -71.94553734,
                   -74.18925577, -75.49758114, -73.88174804, -77.13996262, -72.9946198, -74.01301523, -74.10234115,
-                  -74.01650449, -75.08012079, -73.30850847, -76.60725149, -75.76277267, -70.62495717, -74.22350052,
-                  -75.24183943, -73.49826767, -72.49750711, -69.5161272, -69.92474764]
-    departamentos = df_filtrado['ESTU_DEPTO_RESIDE'].unique()
+                  -74.01650449, -75.08074298, -73.77567029, -73.63687504, -77.28175432, -75.25772519, -75.60702991,
+                  -75.23616327, -77.03924974, -75.72677245, -75.08436212]
 
     # Mapa base
     m = folium.Map(location=[4.570868, -74.297333], zoom_start=5)
@@ -135,11 +134,19 @@ if os.path.exists(file_path):
     # Agregar los marcadores con el nombre y puntaje
     marker_cluster = MarkerCluster().add_to(m)
     for departamento, lat, lon in zip(departamentos, latitudes, longitudes):
+        # Verificar si el puntaje seleccionado existe para el departamento
+        puntaje = df_filtrado_puntaje.loc[df_filtrado_puntaje['ESTU_DEPTO_RESIDE'] == departamento, selected_puntaje]
+        if not puntaje.empty:
+            popup_text = f'{departamento}: {selected_puntaje} = {puntaje.values[0]}'
+        else:
+            popup_text = f'{departamento}: {selected_puntaje} no disponible'
+        
         folium.Marker(
             location=[lat, lon],
-            popup=f'{departamento}: {selected_puntaje} = {df_filtrado_puntaje.loc[df_filtrado_puntaje["ESTU_DEPTO_RESIDE"] == departamento, selected_puntaje].values[0]}',
+            popup=popup_text,
         ).add_to(marker_cluster)
 
     folium_static(m)
+
 else:
     st.error("No se encontró el archivo de datos. Asegúrate de que esté en el directorio correcto.")
