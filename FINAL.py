@@ -131,20 +131,17 @@ if os.path.exists(file_path):
     # Mapa base
     m = folium.Map(location=[4.570868, -74.297333], zoom_start=5)
 
-    # Función para obtener color según el puntaje
-    def get_color(puntaje):
-        norm = mcolors.Normalize(vmin=df_filtrado_puntaje[selected_puntaje].min(), vmax=df_filtrado_puntaje[selected_puntaje].max())
-        cmap = plt.get_cmap("coolwarm")
-        rgba = cmap(norm(puntaje))
-        return mcolors.rgb2hex(rgba[:3])
+    # Definir la escala de colores con valores mínimos y máximos del puntaje
+    min_value = df_filtrado_puntaje[selected_puntaje].min()
+    max_value = df_filtrado_puntaje[selected_puntaje].max()
+    color_scale = folium.LinearColormap(['blue', 'green', 'yellow', 'orange', 'red'], vmin=min_value, vmax=max_value)
 
-    # Agregar los marcadores sin agrupación
+    # Agregar los marcadores con colores basados en el puntaje
     for departamento, lat, lon in zip(departamentos, latitudes, longitudes):
-        # Verificar si el puntaje seleccionado existe para el departamento
         puntaje = df_filtrado_puntaje.loc[df_filtrado_puntaje['ESTU_DEPTO_RESIDE'] == departamento, selected_puntaje]
         if not puntaje.empty:
             popup_text = f'{departamento}: {selected_puntaje} = {puntaje.values[0]}'
-            icon_color = get_color(puntaje.values[0])  # Obtener el color del ícono según el puntaje
+            icon_color = color_scale(puntaje.values[0])  # Obtener el color basado en el puntaje
         else:
             popup_text = f'{departamento}: {selected_puntaje} no disponible'
             icon_color = 'blue'  # Color por defecto si no hay puntaje
@@ -153,9 +150,13 @@ if os.path.exists(file_path):
             folium.Marker(
                 location=[lat, lon],
                 popup=popup_text,
-                icon=folium.Icon(color=icon_color)  # Asignar el color al ícono
+                icon=folium.Icon(color=icon_color, icon_color=icon_color, icon='info-sign')
             ).add_to(m)
 
+    # Agregar la leyenda del mapa
+    color_scale.add_to(m)
+
+    # Mostrar el mapa
     folium_static(m)
 
 else:
