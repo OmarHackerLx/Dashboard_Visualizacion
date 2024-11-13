@@ -4,11 +4,10 @@ import matplotlib.pyplot as plt
 import streamlit as st
 import os
 import folium
-from streamlit_folium import st_folium
+from folium.plugins import HeatMap
 
-# Definir la ruta del archivo Parquet y el archivo GeoJSON
+# Definir la ruta del archivo Parquet
 file_path = 'DatosParquet_reducido.parquet'  # Cambiado a ruta relativa
-col_geojson_path = 'colombia_departamentos.geojson'  # Ruta del archivo GeoJSON de Colombia
 
 # Configuración de estilo
 st.set_page_config(page_title="Dashboard de Puntajes y Estratos", layout="wide")
@@ -90,23 +89,44 @@ if os.path.exists(file_path):
         else:
             st.warning("No hay datos disponibles para los departamentos seleccionados en el gráfico de estratos.")
 
-    # Gráfico del mapa de calor basado en el puntaje seleccionado
-    st.subheader(f'Mapa de calor de {selected_puntaje} por Departamento')
-    if os.path.exists(col_geojson_path):
-        # Crear el mapa de calor
-        m = folium.Map(location=[4.5709, -74.2973], zoom_start=5)
-        folium.Choropleth(
-            geo_data=col_geojson_path,
-            data=df_filtrado_puntaje,
-            columns=["ESTU_DEPTO_RESIDE", selected_puntaje],
-            key_on="feature.properties.NOMBRE_DPT",  # Asegúrate de que coincida con el campo en tu GeoJSON
-            fill_color="RdYlBu_r",
-            fill_opacity=0.7,
-            line_opacity=0.2,
-            legend_name=f"Media de {selected_puntaje} por Departamento"
-        ).add_to(m)
-        st_folium(m, width=700, height=500)
-    else:
-        st.error("Archivo GeoJSON de Colombia no encontrado. Asegúrate de que esté disponible en la ruta especificada.")
+    # Mapa de calor de puntajes por Departamento
+    st.subheader(f'Mapa de Calor de {selected_puntaje} por Departamento')
+
+    # Crear un DataFrame para el mapa
+    df_map = df_filtrado_puntaje[['ESTU_DEPTO_RESIDE', selected_puntaje]]
+
+    # Coordenadas aproximadas de los departamentos (latitud, longitud)
+    departamento_coords = {
+        'ANTIOQUIA': [6.702032125, -75.50455704], 'ATLÁNTICO': [10.67700953, -74.96521949], 'BOGOTÁ, D.C.': [4.316107698, -74.1810727],
+        'BOLÍVAR': [8.079796863, -74.23514814], 'BOYACÁ': [5.891672889, -72.62788054], 'CALDAS': [5.280139978, -75.27498304],
+        'CAQUETÁ': [0.798556195, -73.95946756], 'CAUCA': [2.396833887, -76.82423283], 'CESAR': [9.53665993, -73.51783154],
+        'CÓRDOBA': [8.358549754, -75.79200872], 'CUNDINAMARCA': [4.771120716, -74.43111092], 'CHOCÓ': [5.397581542, -76.942811],
+        # Añadir las coordenadas para el resto de departamentos...
+    }
+
+    # Crear el mapa centrado en Colombia
+    m = folium.Map(location=[4.5709, -74.2973], zoom_start=6)
+
+    # Definir una lista de colores que van de azul a rojo
+    min_value = df_map[selected_puntaje].min()
+    max_value = df_map[selected_puntaje].max()
+    color_scale = folium.LinearColormap(['blue', 'green', 'yellow', 'orange', 'red'], vmin=min_value, vmax=max_value)
+
+    # Agregar los departamentos al mapa con colores según el puntaje
+    for i, row in df_map.iterrows():
+        if row['ESTU_DEPTO_RESIDE'] in departamento_coords:
+            folium.Marker(
+                location=departamento_coords[row['ESTU_DEPTO_RESIDE']],
+                popup=f"{row['ESTU_DEPTO_RESIDE']}: {row[selected_puntaje]:.2f}",
+                icon=folium.Icon(color=color_scale(row[selected_puntaje]), icon_color=color_scale(row[selected_puntaje]), icon='info-sign')
+            ).add_to(m)
+
+    # Agregar la leyenda del mapa
+    color_scale.add_to(m)
+
+    # Mostrar el mapa
+    st.markdown("### Mapa de Calor de Puntajes por Departamento")
+    st.write(m)
+
 else:
     st.error('El archivo Parquet no fue encontrado en la ruta especificada.')
