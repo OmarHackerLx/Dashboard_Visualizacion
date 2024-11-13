@@ -131,16 +131,36 @@ if os.path.exists(file_path):
                 -75.24183943, -73.49826767, -72.49750711, -69.5161272, -69.92474764]
     })
 
-    # Filtrar departamentos según la selección
-    df_departamentos_filtrados = df_departamentos[df_departamentos['departamento'].isin(selected_departamentos)]
-
-    # Crear el mapa
-    m = folium.Map(location=[4.570868, -74.297333], zoom_start=5, control_scale=True)
-
-    for i in df_departamentos_filtrados.iterrows():
-        folium.Marker([i[1]['lat'], i[1]['lon']], popup=f"<b>{i[1]['departamento']}</b>").add_to(m)
-
-    folium_static(m)
-
-else:
-    st.error("El archivo no existe o no se pudo cargar.")
+    # Verifica que las longitudes de las listas sean iguales
+    if len(departamentos) == len(lat) == len(lon):
+        # Crear el DataFrame
+        df_departamentos = pd.DataFrame({
+            'departamento': departamentos,
+            'lat': lat,
+            'lon': lon
+        })
+    else:
+        st.error("Las listas de departamentos, latitudes y longitudes no tienen la misma longitud.")
+        st.stop()
+    
+    # Mapa base
+    m = folium.Map(location=[4.570868, -74.297333], zoom_start=5)
+    
+    # Filtro para seleccionar departamentos
+    departamentos_seleccionados = st.multiselect(
+        'Selecciona los departamentos:', df_departamentos['departamento'].unique())
+    
+    # Filtrar los departamentos seleccionados
+    df_filtrado = df_departamentos[df_departamentos['departamento'].isin(departamentos_seleccionados)]
+    
+    # Agregar marcadores solo para los departamentos seleccionados
+    marker_cluster = MarkerCluster().add_to(m)
+    
+    for idx, row in df_filtrado.iterrows():
+        folium.Marker(
+            location=[row['lat'], row['lon']],
+            popup=row['departamento']
+        ).add_to(marker_cluster)
+    
+    # Mostrar el mapa
+    st.write(m)
