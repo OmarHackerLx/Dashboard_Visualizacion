@@ -89,44 +89,77 @@ if os.path.exists(file_path):
         else:
             st.warning("No hay datos disponibles para los departamentos seleccionados en el gráfico de estratos.")
 
-    # Mapa de calor de puntajes por Departamento
-    st.subheader(f'Mapa de Calor de {selected_puntaje} por Departamento')
+    # Fila completa para gráfico de burbujas
+    st.subheader(f'Relación entre {selected_puntaje}, Estrato y Departamento')
+    if not df_filtrado_puntaje.empty and not df_filtrado_estrato.empty:
+        df_combined = pd.merge(df_filtrado_puntaje, df_filtrado_estrato, on='ESTU_DEPTO_RESIDE')
+        plt.figure(figsize=(14, 8))
+        scatter_plot = sns.scatterplot(
+            data=df_combined, 
+            y='ESTU_DEPTO_RESIDE', 
+            x=selected_puntaje, 
+            size='FAMI_ESTRATOVIVIENDA', 
+            sizes=(20, 200), 
+            hue='FAMI_ESTRATOVIVIENDA', 
+            palette='coolwarm', 
+            legend="brief"
+        )
+        plt.title(f'Relación entre {selected_puntaje}, Estrato de Vivienda y Departamento', fontsize=16)
+        plt.ylabel('Departamento', fontsize=14)
+        plt.xlabel(f'Media de {selected_puntaje}', fontsize=14)
+        plt.xticks(rotation=0)
+        st.pyplot(plt)
+        plt.close()
+    else:
+        st.warning("No hay datos suficientes para mostrar el gráfico de relación entre puntaje, estrato y departamento.")
 
-    # Crear un DataFrame para el mapa
-    df_map = df_filtrado_puntaje[['ESTU_DEPTO_RESIDE', selected_puntaje]]
+    # Crear el mapa con folium
+    st.subheader(f'Mapa de Colombia: Puntaje Promedio por Departamento')
 
-    # Coordenadas aproximadas de los departamentos (latitud, longitud)
-    departamento_coords = {
-        'ANTIOQUIA': [6.702032125, -75.50455704], 'ATLÁNTICO': [10.67700953, -74.96521949], 'BOGOTÁ, D.C.': [4.316107698, -74.1810727],
-        'BOLÍVAR': [8.079796863, -74.23514814], 'BOYACÁ': [5.891672889, -72.62788054], 'CALDAS': [5.280139978, -75.27498304],
-        'CAQUETÁ': [0.798556195, -73.95946756], 'CAUCA': [2.396833887, -76.82423283], 'CESAR': [9.53665993, -73.51783154],
-        'CÓRDOBA': [8.358549754, -75.79200872], 'CUNDINAMARCA': [4.771120716, -74.43111092], 'CHOCÓ': [5.397581542, -76.942811],
-        # Añadir las coordenadas para el resto de departamentos...
+    # Definir las coordenadas de los departamentos de Colombia
+    departamentos_coords = {
+        'ANTIOQUIA': [6.702032125, -75.50455704],
+        'ATLÁNTICO': [10.67700953, -74.96521949],
+        'BOGOTÁ, D.C.': [4.316107698, -74.1810727],
+        'BOLÍVAR': [8.079796863, -74.23514814],
+        'BOYACÁ': [5.891672889, -72.62788054],
+        'CALDAS': [5.280139978, -75.27498304],
+        'CAQUETÁ': [0.798556195, -73.95946756],
+        'CAUCA': [2.396833887, -76.82423283],
+        'CESAR': [9.53665993, -73.51783154],
+        'CÓRDOBA': [8.358549754, -75.79200872],
+        'CUNDINAMARCA': [4.771120716, -74.43111092],
+        'CHOCÓ': [5.397581542, -76.942811],
+        'HUILA': [2.570143029, -75.58434836],
+        'LA GUAJIRA': [11.47687008, -72.42951072],
+        'MAGDALENA': [10.24738355, -74.26175733],
+        'META': [3.345562732, -72.95645988],
+        'NARIÑO': [1.571094987, -77.87020496],
+        'NORTE DE SANTANDER': [8.09513751, -72.88188297],
+        'QUINDÍO': [4.455241567, -75.68962853],
+        'RISARALDA': [5.240757239, -76.00244469],
+        'SANTANDER': [6.54883958, -73.25127618],
+        'SAN ANDRÉS, PROVIDENCIA Y SANTA CATALINA': [12.58207935, -81.71132979],
+        'SUCRES': [9.3075371, -75.38898985],
+        'TOLIMA': [4.075072741, -75.3464266],
+        'VALLE DEL CAUCA': [3.55548919, -76.30013569],
+        'VICHADA': [4.415401911, -69.64326764]
     }
 
-    # Crear el mapa centrado en Colombia
-    m = folium.Map(location=[4.5709, -74.2973], zoom_start=6)
+    # Crear un mapa centrado en Colombia
+    colombia_map = folium.Map(location=[4.5709, -74.2973], zoom_start=6)
 
-    # Definir una lista de colores que van de azul a rojo
-    min_value = df_map[selected_puntaje].min()
-    max_value = df_map[selected_puntaje].max()
-    color_scale = folium.LinearColormap(['blue', 'green', 'yellow', 'orange', 'red'], vmin=min_value, vmax=max_value)
+    # Agregar un HeatMap con puntajes promedio de cada departamento
+    heat_data = []
+    for depto, coords in departamentos_coords.items():
+        if depto in df_filtrado_puntaje['ESTU_DEPTO_RESIDE'].values:
+            promedio_puntaje = df_filtrado_puntaje[df_filtrado_puntaje['ESTU_DEPTO_RESIDE'] == depto][selected_puntaje].values[0]
+            heat_data.append([coords[0], coords[1], promedio_puntaje])
 
-    # Agregar los departamentos al mapa con colores según el puntaje
-    for i, row in df_map.iterrows():
-        if row['ESTU_DEPTO_RESIDE'] in departamento_coords:
-            folium.Marker(
-                location=departamento_coords[row['ESTU_DEPTO_RESIDE']],
-                popup=f"{row['ESTU_DEPTO_RESIDE']}: {row[selected_puntaje]:.2f}",
-                icon=folium.Icon(color=color_scale(row[selected_puntaje]), icon_color=color_scale(row[selected_puntaje]), icon='info-sign')
-            ).add_to(m)
+    HeatMap(heat_data).add_to(colombia_map)
 
-    # Agregar la leyenda del mapa
-    color_scale.add_to(m)
-
-    # Mostrar el mapa
-    st.markdown("### Mapa de Calor de Puntajes por Departamento")
-    st.write(m)
+    # Mostrar el mapa en Streamlit
+    st.write(colombia_map)
 
 else:
-    st.error('El archivo Parquet no fue encontrado en la ruta especificada.')
+    st.error(f'El archivo {file_path} no existe.')
