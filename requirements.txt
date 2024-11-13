@@ -4,3 +4,4 @@ matplotlib
 streamlit
 pyarrow  # Si estás usando Parquet
 geopandas
+folium
