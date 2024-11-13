@@ -1,99 +1,177 @@
-import folium
-from folium.plugins import HeatMap
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 import streamlit as st
+import os
+import folium
+from folium.plugins import HeatMap
 
-# Cargar el archivo Parquet
-df_filtrado_puntaje = pd.read_parquet("ruta_a_tu_archivo.parquet")
+# Definir la ruta del archivo Parquet
+file_path = 'DatosParquet_reducido.parquet'  # Cambiado a ruta relativa
 
-# Lista de departamentos y sus coordenadas (latitud y longitud)
-departamentos_coords = {
-    "Amazonas": [-3.4653, -70.6513],
-    "Antioquia": [6.4971, -75.3604],
-    "Atlántico": [10.4218, -74.2116],
-    "Bogotá": [4.6097, -74.0817],
-    "Bolívar": [10.3910, -75.4794],
-    "Boyacá": [5.5545, -73.3626],
-    "Caldas": [5.0621, -75.5386],
-    "Caquetá": [1.6111, -75.6167],
-    "Casanare": [5.8590, -72.5225],
-    "Cauca": [2.4967, -76.6052],
-    "Cesar": [10.4630, -74.2792],
-    "Chocó": [5.6915, -77.2035],
-    "Córdoba": [8.7494, -75.8810],
-    "Cundinamarca": [4.3457, -74.4582],
-    "Guainía": [3.8750, -67.6699],
-    "Guaviare": [3.0492, -71.5956],
-    "Huila": [2.9166, -75.3703],
-    "La Guajira": [11.5515, -71.7168],
-    "Magdalena": [10.4775, -74.2199],
-    "Meta": [4.0926, -73.7033],
-    "Nariño": [1.2095, -77.2684],
-    "Norte de Santander": [7.9305, -72.5071],
-    "Putumayo": [1.3754, -76.6141],
-    "Quindío": [4.5352, -75.6814],
-    "Risaralda": [5.2637, -75.6042],
-    "San Andrés y Providencia": [12.5847, -81.7111],
-    "Santander": [7.6899, -73.9352],
-    "Sucre": [9.3130, -75.3640],
-    "Tolima": [4.0985, -75.6057],
-    "Valle del Cauca": [3.4372, -76.5223],
-    "Vaupés": [0.9467, -70.6398],
-    "Vichada": [5.1495, -67.1978]
-}
+# Configuración de estilo
+st.set_page_config(page_title="Dashboard de Puntajes y Estratos", layout="wide")
+st.title('Dashboard de Puntajes y Estratos por Departamento')
 
-# Columna de puntajes a utilizar
-selected_puntaje = "Puntaje_promedio"  # Ajusta este nombre de columna si es necesario
+# Verificar si el archivo Parquet existe
+if os.path.exists(file_path):
+    # Cargar el archivo Parquet
+    df = pd.read_parquet(file_path)
 
-# Crear el mapa centrado en Colombia
-colombia_map = folium.Map(location=[4.5709, -74.2973], zoom_start=6)
+    # Filtrar los datos eliminando valores nulos en 'ESTU_DEPTO_RESIDE'
+    df_filtrado = df.dropna(subset=['ESTU_DEPTO_RESIDE'])
 
-# Agregar HeatMap con los datos de los departamentos y sus puntajes
-heat_data = []
-for depto, coords in departamentos_coords.items():
-    if depto in df_filtrado_puntaje['ESTU_DEPTO_RESIDE'].values:
-        promedio_puntaje = df_filtrado_puntaje[df_filtrado_puntaje['ESTU_DEPTO_RESIDE'] == depto][selected_puntaje].values[0]
-        heat_data.append([coords[0], coords[1], promedio_puntaje])
+    # Crear un diccionario para mapear los valores de estratos a números
+    estrato_mapping = {
+        "Sin Estrato": None,
+        "Estrato 1": 1,
+        "Estrato 2": 2,
+        "Estrato 3": 3,
+        "Estrato 4": 4,
+        "Estrato 5": 5,
+        "Estrato 6": 6
+    }
 
-# Crear el HeatMap
-HeatMap(heat_data).add_to(colombia_map)
+    # Reemplazar los valores de la columna 'FAMI_ESTRATOVIVIENDA' por valores numéricos
+    df_filtrado['FAMI_ESTRATOVIVIENDA'] = df_filtrado['FAMI_ESTRATOVIVIENDA'].map(estrato_mapping)
 
-# Mostrar el mapa en Streamlit
-map_html = colombia_map._repr_html_()  # Este método obtiene el código HTML del mapa
-st.markdown(map_html, unsafe_allow_html=True)
+    # Sidebar: Selección de puntaje y departamentos
+    st.sidebar.header('Filtros del Dashboard')
+    puntajes_columnas = ['PUNT_LECTURA_CRITICA', 'PUNT_MATEMATICAS', 'PUNT_C_NATURALES', 
+                         'PUNT_SOCIALES_CIUDADANAS', 'PUNT_INGLES', 'PUNT_GLOBAL']
+    selected_puntaje = st.sidebar.radio('Selecciona el puntaje a visualizar:', puntajes_columnas)
 
-# Gráfico de puntajes por departamento
-st.subheader("Puntajes Promedio por Departamento")
+    # Agrupaciones y filtrado
+    df_agrupado_puntajes = df.groupby('ESTU_DEPTO_RESIDE')[puntajes_columnas].mean().reset_index()
+    df_agrupado_estrato = df_filtrado.dropna(subset=['FAMI_ESTRATOVIVIENDA']).groupby('ESTU_DEPTO_RESIDE')['FAMI_ESTRATOVIVIENDA'].mean().reset_index()
+    departamentos = df_agrupado_puntajes['ESTU_DEPTO_RESIDE'].unique()
+    selected_departamentos = st.sidebar.multiselect('Selecciona los departamentos:', options=departamentos, default=departamentos)
 
-# Gráfico de barras
-puntajes_por_departamento = df_filtrado_puntaje.groupby("ESTU_DEPTO_RESIDE")[selected_puntaje].mean().reset_index()
-plt.figure(figsize=(10, 6))
-sns.barplot(x="ESTU_DEPTO_RESIDE", y=selected_puntaje, data=puntajes_por_departamento, palette="viridis")
-plt.xticks(rotation=90)
-plt.title("Puntajes Promedio por Departamento")
-plt.xlabel("Departamento")
-plt.ylabel("Puntaje Promedio")
-st.pyplot(plt)
+    df_filtrado_puntaje = df_agrupado_puntajes[df_agrupado_puntajes['ESTU_DEPTO_RESIDE'].isin(selected_departamentos)]
+    df_filtrado_estrato = df_agrupado_estrato[df_agrupado_estrato['ESTU_DEPTO_RESIDE'].isin(selected_departamentos)]
 
-# Gráfico de dispersión para visualizar la relación entre puntaje y otra variable (por ejemplo, población)
-# Asegúrate de tener una columna para la variable con la que quieras correlacionar el puntaje.
-if "Población" in df_filtrado_puntaje.columns:
-    st.subheader("Relación entre Puntaje Promedio y Población")
-    plt.figure(figsize=(10, 6))
-    sns.scatterplot(x="Población", y=selected_puntaje, data=df_filtrado_puntaje, hue="ESTU_DEPTO_RESIDE", palette="Set1")
-    plt.title("Relación entre Puntaje Promedio y Población")
-    plt.xlabel("Población")
-    plt.ylabel("Puntaje Promedio")
-    st.pyplot(plt)
+    # Dashboard: Gráficos organizados en columnas
+    col1, col2 = st.columns(2)
 
-# Gráfico de distribución del puntaje
-st.subheader("Distribución de Puntajes Promedio")
+    # Gráfico de puntajes (ejes X e Y invertidos)
+    with col1:
+        st.subheader(f'Media de {selected_puntaje} por Departamento')
+        if not df_filtrado_puntaje.empty:
+            plt.figure(figsize=(12, 6))
+            df_filtrado_puntaje = df_filtrado_puntaje.sort_values(by=selected_puntaje)
+            bar_plot = sns.barplot(data=df_filtrado_puntaje, y='ESTU_DEPTO_RESIDE', x=selected_puntaje, palette='viridis')
+            plt.title(f'Media del {selected_puntaje} por Departamento', fontsize=16)
+            plt.ylabel('Departamento', fontsize=14)
+            plt.xlabel(f'Media de {selected_puntaje}', fontsize=14)
+            plt.xticks(rotation=0)
+            for p in bar_plot.patches:
+                bar_plot.annotate(f'{p.get_width():.1f}', (p.get_width(), p.get_y() + p.get_height() / 2.), ha='center', va='center', fontsize=8, color='black')
+            st.pyplot(plt)
+            plt.close()
+        else:
+            st.warning("No hay departamentos seleccionados para mostrar el gráfico de puntajes.")
 
-plt.figure(figsize=(10, 6))
-sns.histplot(df_filtrado_puntaje[selected_puntaje], bins=20, kde=True, color="blue")
-plt.title("Distribución de Puntajes Promedio")
-plt.xlabel("Puntaje Promedio")
-plt.ylabel("Frecuencia")
-st.pyplot(plt)
+    # Gráfico de estratos (ejes X e Y invertidos)
+    with col2:
+        st.subheader('Media de FAMI_ESTRATOVIVIENDA por Departamento')
+        if not df_filtrado_estrato.empty:
+            plt.figure(figsize=(12, 6))
+            df_filtrado_estrato = df_filtrado_estrato.sort_values(by='FAMI_ESTRATOVIVIENDA')
+            bar_plot_estrato = sns.barplot(data=df_filtrado_estrato, y='ESTU_DEPTO_RESIDE', x='FAMI_ESTRATOVIVIENDA', palette='coolwarm')
+            plt.title('Media del Estrato de Vivienda por Departamento', fontsize=16)
+            plt.ylabel('Departamento', fontsize=14)
+            plt.xlabel('Media del Estrato de Vivienda', fontsize=14)
+            plt.xticks(rotation=0)
+            for p in bar_plot_estrato.patches:
+                bar_plot_estrato.annotate(f'{p.get_width():.1f}', (p.get_width(), p.get_y() + p.get_height() / 2.), ha='center', va='center', fontsize=8, color='black')
+            st.pyplot(plt)
+            plt.close()
+        else:
+            st.warning("No hay datos disponibles para los departamentos seleccionados en el gráfico de estratos.")
+
+    # Fila completa para gráfico de burbujas
+    st.subheader(f'Relación entre {selected_puntaje}, Estrato y Departamento')
+    if not df_filtrado_puntaje.empty and not df_filtrado_estrato.empty:
+        df_combined = pd.merge(df_filtrado_puntaje, df_filtrado_estrato, on='ESTU_DEPTO_RESIDE')
+        plt.figure(figsize=(14, 8))
+        scatter_plot = sns.scatterplot(
+            data=df_combined, 
+            y='ESTU_DEPTO_RESIDE', 
+            x=selected_puntaje, 
+            size='FAMI_ESTRATOVIVIENDA', 
+            sizes=(20, 200), 
+            hue='FAMI_ESTRATOVIVIENDA', 
+            palette='coolwarm', 
+            legend="brief"
+        )
+        plt.title(f'Relación entre {selected_puntaje}, Estrato de Vivienda y Departamento', fontsize=16)
+        plt.ylabel('Departamento', fontsize=14)
+        plt.xlabel(f'Media de {selected_puntaje}', fontsize=14)
+        plt.xticks(rotation=0)
+        st.pyplot(plt)
+        plt.close()
+    else:
+        st.warning("No hay datos suficientes para mostrar el gráfico de relación entre puntaje, estrato y departamento.")
+
+    # Agregar el mapa interactivo de folium
+    st.subheader("Mapa Interactivo de Puntajes por Departamento")
+
+    # Diccionario de coordenadas de departamentos
+    departamentos_coords = {
+        "Amazonas": [-3.4653, -70.6513],
+        "Antioquia": [6.4971, -75.3604],
+        "Atlántico": [10.4218, -74.2116],
+        "Bogotá": [4.6097, -74.0817],
+        "Bolívar": [10.3910, -75.4794],
+        "Boyacá": [5.5545, -73.3626],
+        "Caldas": [5.0621, -75.5386],
+        "Caquetá": [1.6111, -75.6167],
+        "Casanare": [5.8590, -72.5225],
+        "Cauca": [2.4967, -76.6052],
+        "Cesar": [10.4630, -74.2792],
+        "Chocó": [5.6915, -77.2035],
+        "Córdoba": [8.7494, -75.8810],
+        "Cundinamarca": [4.3457, -74.4582],
+        "Guainía": [3.8750, -67.6699],
+        "Guaviare": [3.0492, -71.5956],
+        "Huila": [2.9166, -75.3703],
+        "La Guajira": [11.5515, -71.7168],
+        "Magdalena": [10.4775, -74.2199],
+        "Meta": [4.0926, -73.7033],
+        "Nariño": [1.2095, -77.2684],
+        "Norte de Santander": [7.9305, -72.5071],
+        "Putumayo": [1.3754, -76.6141],
+        "Quindío": [4.5352, -75.6814],
+        "Risaralda": [5.2637, -75.6042],
+        "San Andrés y Providencia": [12.5800, -81.7117],
+        "Santander": [7.6775, -73.1072],
+        "Sucre": [9.2911, -75.4028],
+        "Tolima": [4.0914, -75.2096],
+        "Valle del Cauca": [3.4680, -76.5305],
+        "Vaupés": [0.7405, -70.4971],
+        "Vichada": [4.8673, -69.1814]
+    }
+
+    # Crear el mapa de folium centrado en Colombia
+    m = folium.Map(location=[4.5709, -74.2973], zoom_start=5)
+
+    # Agregar puntos al mapa
+    for depto in selected_departamentos:
+        if depto in departamentos_coords:
+            lat, lon = departamentos_coords[depto]
+            folium.CircleMarker(
+                location=[lat, lon],
+                radius=8,
+                color='blue',
+                fill=True,
+                fill_color='blue',
+                fill_opacity=0.6,
+                popup=f'{depto}: {df_filtrado_puntaje[df_filtrado_puntaje["ESTU_DEPTO_RESIDE"] == depto][selected_puntaje].mean():.2f}'
+            ).add_to(m)
+
+    # Mostrar el mapa
+    st.subheader("Mapa de Puntajes por Departamento")
+    folium_static(m)
+
+else:
+    st.error('El archivo Parquet no fue encontrado en la ruta especificada.')
