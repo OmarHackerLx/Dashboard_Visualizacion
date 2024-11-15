@@ -3,10 +3,6 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import streamlit as st
 import os
-import folium
-from folium import plugins
-from streamlit_folium import folium_static
-import matplotlib.colors as mcolors
 
 # Definir la ruta del archivo Parquet
 file_path = 'DatosParquet_reducido.parquet'  # Cambiado a ruta relativa
@@ -114,54 +110,5 @@ if os.path.exists(file_path):
         plt.close()
     else:
         st.warning("No hay datos suficientes para mostrar el gráfico de relación entre puntaje, estrato y departamento.")
-
-    # Mapa con Folium
-    st.subheader('Mapa Interactivo de los Departamentos')
-
-    # Datos de los departamentos con latitudes y longitudes
-    latitudes = [
-    6.702032125, 10.67700953, 4.316107698, 8.079796863, 5.891672889, 5.280139978, 0.798556195, 2.396833887,
-    9.53665993, 8.358549754, 4.771120716, 5.397581542, 2.570143029, 11.47687008, 10.24738355, 3.345562732,
-    1.571094987, 8.09513751, 4.455241567, 5.240757239, 6.693633184, 9.064941448, 4.03477252, 3.569858693,
-    6.569577215, 5.404064237, 0.3673031, 12.54311512, -1.54622768, 2.727842865, 1.924531973, 0.64624561, 4.713557125]  # Latitudes
-    
-    longitudes = [
-    -75.50455704, -74.96521949, -74.1810727, -74.23514814, -72.62788054, -75.27498304, -73.95946756, -76.82423283,
-    -73.51783154, -75.79200872, -74.43111092, -76.942811, -75.58434836, -72.42951072, -74.26175733, -72.95645988,
-    -77.87020496, -72.88188297, -75.68962853, -76.00244469, -73.48600894, -75.10981755, -75.2558271, -76.62850427,
-    -70.96732394, -71.60188073, -75.51406183, -81.71762382, -71.50212858, -68.81661272, -72.12859569, -70.56140566,
-    -69.41400011]
-
-    # Mapa base
-    m = folium.Map(location=[4.570868, -74.297333], zoom_start=5)
-
-    # Definir la escala de colores con valores mínimos y máximos del puntaje
-    min_value = df_filtrado_puntaje[selected_puntaje].min()
-    max_value = df_filtrado_puntaje[selected_puntaje].max()
-    color_scale = folium.LinearColormap(['blue', 'green', 'yellow', 'orange', 'red'], vmin=min_value, vmax=max_value)
-
-    # Agregar los marcadores con colores basados en el puntaje
-    for departamento, lat, lon in zip(departamentos, latitudes, longitudes):
-        puntaje = df_filtrado_puntaje.loc[df_filtrado_puntaje['ESTU_DEPTO_RESIDE'] == departamento, selected_puntaje]
-        if not puntaje.empty:
-            popup_text = f'{departamento}: {selected_puntaje} = {puntaje.values[0]}'
-            icon_color = color_scale(puntaje.values[0])  # Obtener el color basado en el puntaje
-        else:
-            popup_text = f'{departamento}: {selected_puntaje} no disponible'
-            icon_color = 'blue'  # Color por defecto si no hay puntaje
-        
-        if departamento in selected_departamentos:
-            folium.Marker(
-                location=[lat, lon],
-                popup=popup_text,
-                icon=folium.Icon(color=icon_color, icon_color=icon_color, icon='info-sign')
-            ).add_to(m)
-
-    # Agregar la leyenda del mapa
-    color_scale.add_to(m)
-
-    # Mostrar el mapa
-    folium_static(m)
-
 else:
     st.error("No se encontró el archivo de datos. Asegúrate de que esté en el directorio correcto.")
