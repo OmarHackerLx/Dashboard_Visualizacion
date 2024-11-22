@@ -1,4 +1,10 @@
-# Mostrar el gráfico comparativo de puntajes entre el mejor y el peor departamento
+# Filtrar y agrupar los puntajes por departamento
+df_agrupado_puntajes = df.groupby('ESTU_DEPTO_RESIDE')[puntajes_columnas].mean().reset_index()
+
+# Filtrar por los departamentos seleccionados
+df_filtrado_puntaje = df_agrupado_puntajes[df_agrupado_puntajes['ESTU_DEPTO_RESIDE'].isin(selected_departamentos)]
+
+# Verificar si df_filtrado_puntaje no está vacío
 if not df_filtrado_puntaje.empty:
     # Obtener el mejor y peor puntaje
     mejor_departamento = df_filtrado_puntaje.loc[df_filtrado_puntaje[selected_puntaje].idxmax()]
@@ -10,7 +16,7 @@ if not df_filtrado_puntaje.empty:
         selected_puntaje: [mejor_departamento[selected_puntaje], peor_departamento[selected_puntaje]]
     })
 
-    # Configuración del gráfico de barras para los mejores y peores departamentos
+    # Configurar el gráfico de barras para los mejores y peores departamentos
     plt.figure(figsize=(14, 8))
 
     # Crear la paleta personalizada para los colores
