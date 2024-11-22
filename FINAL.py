@@ -7,11 +7,12 @@ import folium
 from math import pi
 from io import BytesIO
 
-# Cargar datos
-@st.cache
-def cargar_datos():
+import os
+if os.path.exists('DatosParquet.parquet'):
     df = pd.read_parquet('DatosParquet.parquet')
-    return df
+else:
+    st.error("File not found!")
+
 
 # Cargar y procesar datos
 df = cargar_datos()
