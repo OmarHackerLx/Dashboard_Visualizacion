@@ -3,18 +3,20 @@ import numpy as np
 import matplotlib.pyplot as plt
 import streamlit as st
 
-# Suponemos que ya has cargado el DataFrame df y filtrado los mejores y peores departamentos
-# Aquí ya hemos normalizado y procesado los datos como en el código original.
+# Aquí debes asegurarte de cargar tu DataFrame df correctamente. Por ejemplo:
+# df = pd.read_csv('tu_archivo.csv')
 
-# Filtrar los mejores y peores departamentos (suponiendo que ya tienes estos departamentos)
-# Aquí seleccionamos "MEJOR DEPARTAMENTO" y "PEOR DEPARTAMENTO" de ejemplo
-mejor_departamento = df_filtrado_puntaje.loc[df_filtrado_puntaje[selected_puntaje].idxmax()]
-peor_departamento = df_filtrado_puntaje.loc[df_filtrado_puntaje[selected_puntaje].idxmin()]
+# Aseguramos que df contiene la columna de puntajes 'PUNT_GLOBAL' para identificar el mejor y peor departamento
+# Filtrar el mejor y peor departamento basado en PUNT_GLOBAL
+mejor_departamento = df.loc[df['PUNT_GLOBAL'].idxmax()]
+peor_departamento = df.loc[df['PUNT_GLOBAL'].idxmin()]
 
-# Filtramos los datos de df_radar para los departamentos seleccionados
-df_radar = df[['ESTU_DEPTO_RESIDE', 'FAMI_ESTRATOVIVIENDA', 'FAMI_EDUCACIONPADRE', 'FAMI_EDUCACIONMADRE', 'FAMI_TIENEINTERNET', 'FAMI_TIENECOMPUTADOR', 'FAMI_NUMLIBROS', 'PUNT_GLOBAL']]
+# Aseguramos que las columnas necesarias existen
+df_radar = df[['ESTU_DEPTO_RESIDE', 'FAMI_ESTRATOVIVIENDA', 'FAMI_EDUCACIONPADRE', 
+               'FAMI_EDUCACIONMADRE', 'FAMI_TIENEINTERNET', 'FAMI_TIENECOMPUTADOR', 
+               'FAMI_NUMLIBROS', 'PUNT_GLOBAL']]
 
-# Realizamos el procesamiento que ya mencionaste para los datos
+# Procesamiento de las columnas (como lo hiciste en el código original)
 df_radar['FAMI_ESTRATOVIVIENDA'] = df_radar['FAMI_ESTRATOVIVIENDA'].replace({'Sin Estrato': None}).str.replace('Estrato ', '', regex=False).astype(float)
 
 # Diccionario de niveles de educación
@@ -52,7 +54,7 @@ orden_libros = [
 diccionario_libros = dict(orden_libros)
 df_radar['FAMI_NUMLIBROS'] = df_radar['FAMI_NUMLIBROS'].replace(diccionario_libros).astype(float)
 
-# Normalizar las columnas numéricas usando Min-Max
+# Normalización de las columnas numéricas
 df_radar_normalizado = df_radar.copy()
 columnas_a_normalizar = ['FAMI_ESTRATOVIVIENDA', 'FAMI_EDUCACIONPADRE', 'FAMI_EDUCACIONMADRE', 
                          'FAMI_TIENEINTERNET', 'FAMI_TIENECOMPUTADOR', 'FAMI_NUMLIBROS']
