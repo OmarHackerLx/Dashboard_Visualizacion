@@ -5,122 +5,175 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import folium
 from math import pi
+from io import BytesIO
 
-# Cargar el DataFrame
+# Cargar datos
 @st.cache
-def cargar_dataframe():
-    return pd.read_parquet('DatosParquet.parquet')
+def cargar_datos():
+    df = pd.read_parquet('DatosParquet.parquet')
+    return df
 
-df = cargar_dataframe()
+# Cargar y procesar datos
+df = cargar_datos()
 
-# Mostrar el DataFrame
-st.title('Análisis de Datos')
-st.write(df.head())
+# Procesamiento de datos para el radar
+def procesar_datos_radar(df):
+    df_radar = df[['ESTU_DEPTO_RESIDE', 'FAMI_ESTRATOVIVIENDA', 'FAMI_EDUCACIONPADRE', 'FAMI_EDUCACIONMADRE', 
+                   'FAMI_TIENEINTERNET', 'FAMI_TIENECOMPUTADOR', 'FAMI_NUMLIBROS', 'PUNT_GLOBAL']]
+    
+    # Reemplazo de valores y conversión
+    df_radar['FAMI_ESTRATOVIVIENDA'] = df_radar['FAMI_ESTRATOVIVIENDA'].replace({'Sin Estrato': None}).str.replace('Estrato ', '', regex=False).astype(float)
+    
+    orden_educacion = [
+        ('Postgrado', 13), ('Educación profesional completa', 12), ('Educación profesional incompleta', 11),
+        ('Técnica o tecnológica completa', 10), ('Secundaria (Bachillerato) completa', 9),
+        ('Primaria completa', 8), ('Técnica o tecnológica incompleta', 7), ('Secundaria (Bachillerato) incompleta', 6),
+        ('Primaria incompleta', 5), ('Ninguno', 4), ('No Aplica', 3), ('No sabe', 2), (None, 1)
+    ]
+    diccionario_educacion = dict(orden_educacion)
+    
+    df_radar['FAMI_EDUCACIONPADRE'] = df_radar['FAMI_EDUCACIONPADRE'].replace(diccionario_educacion)
+    df_radar['FAMI_EDUCACIONMADRE'] = df_radar['FAMI_EDUCACIONMADRE'].replace(diccionario_educacion)
 
-# Radar
-st.header('Comparación Normalizada entre Bogotá y Chocó')
-# Procesar los datos para el gráfico de radar
-df_radar = df[['ESTU_DEPTO_RESIDE', 'FAMI_ESTRATOVIVIENDA', 'FAMI_EDUCACIONPADRE', 'FAMI_EDUCACIONMADRE', 
-               'FAMI_TIENEINTERNET', 'FAMI_TIENECOMPUTADOR', 'FAMI_NUMLIBROS', 'PUNT_GLOBAL']]
+    df_radar['FAMI_TIENEINTERNET'] = df_radar['FAMI_TIENEINTERNET'].replace({'Sí': 1, 'No': 0, 'Si': 1}).astype(float)
+    df_radar['FAMI_TIENECOMPUTADOR'] = df_radar['FAMI_TIENECOMPUTADOR'].replace({'Sí': 1, 'No': 0, 'Si': 1}).astype(float)
 
-# Normalización y procesamiento
-columnas_a_normalizar = ['FAMI_ESTRATOVIVIENDA', 'FAMI_EDUCACIONPADRE', 'FAMI_EDUCACIONMADRE', 
-                         'FAMI_TIENEINTERNET', 'FAMI_TIENECOMPUTADOR', 'FAMI_NUMLIBROS']
+    orden_libros = [
+        ('MÁS DE 100 LIBROS', 5), ('26 A 100 LIBROS', 4), ('11 A 25 LIBROS', 3), 
+        ('0 A 10 LIBROS', 2), (None, 1)
+    ]
+    diccionario_libros = dict(orden_libros)
 
-# Normalizar los datos
-df_radar_normalizado = df_radar.copy()
-for columna in columnas_a_normalizar:
-    min_val = df_radar_normalizado[columna].min()
-    max_val = df_radar_normalizado[columna].max()
-    df_radar_normalizado[columna] = (df_radar_normalizado[columna] - min_val) / (max_val - min_val)
+    df_radar['FAMI_NUMLIBROS'] = df_radar['FAMI_NUMLIBROS'].replace(diccionario_libros).astype(float)
+    
+    return df_radar
 
-# Filtrar los datos para Bogotá y Chocó
-bogota_data_normalizado = df_radar_normalizado[df_radar_normalizado['ESTU_DEPTO_RESIDE'] == 'BOGOTÁ']
-choco_data_normalizado = df_radar_normalizado[df_radar_normalizado['ESTU_DEPTO_RESIDE'] == 'CHOCO']
+# Función para mostrar el gráfico radar
+def mostrar_radar(df_radar):
+    df_radar_normalizado = df_radar.copy()
+    columnas_a_normalizar = ['FAMI_ESTRATOVIVIENDA', 'FAMI_EDUCACIONPADRE', 'FAMI_EDUCACIONMADRE', 
+                             'FAMI_TIENEINTERNET', 'FAMI_TIENECOMPUTADOR', 'FAMI_NUMLIBROS']
 
-# Promedios de Bogotá y Chocó
-promedios_bogota_normalizados = bogota_data_normalizado[columnas_a_normalizar].mean()
-promedios_choco_normalizados = choco_data_normalizado[columnas_a_normalizar].mean()
+    for columna in columnas_a_normalizar:
+        min_val = df_radar_normalizado[columna].min()
+        max_val = df_radar_normalizado[columna].max()
+        df_radar_normalizado[columna] = (df_radar_normalizado[columna] - min_val) / (max_val - min_val)
+    
+    bogota_data_normalizado = df_radar_normalizado[df_radar_normalizado['ESTU_DEPTO_RESIDE'] == 'BOGOTÁ']
+    choco_data_normalizado = df_radar_normalizado[df_radar_normalizado['ESTU_DEPTO_RESIDE'] == 'CHOCO']
+    
+    promedios_bogota_normalizados = bogota_data_normalizado[columnas_a_normalizar].mean()
+    promedios_choco_normalizados = choco_data_normalizado[columnas_a_normalizar].mean()
+    
+    nuevas_etiquetas = [
+        'Estrato de Vivienda', 'Nivel Educativo del Padre', 'Nivel Educativo de la Madre', 
+        'Acceso a Internet', 'Disponibilidad de Computadora', 'Número de Libros del Hogar'
+    ]
+    
+    promedios_bogota = promedios_bogota_normalizados.tolist()
+    promedios_choco = promedios_choco_normalizados.tolist()
 
-nuevas_etiquetas = ['Estrato de Vivienda', 'Nivel Educativo del Padre', 'Nivel Educativo de la Madre', 
-                    'Acceso a Internet', 'Disponibilidad de Computadora', 'Número de Libros del Hogar']
+    num_vars = len(nuevas_etiquetas)
+    angles = np.linspace(0, 2 * np.pi, num_vars, endpoint=False).tolist()
+    angles += angles[:1]
 
-# Crear gráfico de radar
-promedios_bogota = promedios_bogota_normalizados.tolist()
-promedios_choco = promedios_choco_normalizados.tolist()
+    promedios_bogota += promedios_bogota[:1]
+    promedios_choco += promedios_choco[:1]
 
-# Número de categorías
-num_vars = len(nuevas_etiquetas)
-angles = np.linspace(0, 2 * np.pi, num_vars, endpoint=False).tolist()
-angles += angles[:1]  # Cerrar el gráfico
+    fig, ax = plt.subplots(figsize=(7, 7), dpi=100, subplot_kw=dict(polar=True))
 
-promedios_bogota += promedios_bogota[:1]
-promedios_choco += promedios_choco[:1]
+    ax.plot(angles, promedios_bogota, color='green', linewidth=2, linestyle='solid', label='Bogotá')
+    ax.fill(angles, promedios_bogota, color='green', alpha=0.25)
 
-fig, ax = plt.subplots(figsize=(7, 7), dpi=100, subplot_kw=dict(polar=True))
+    ax.plot(angles, promedios_choco, color='red', linewidth=2, linestyle='solid', label='Chocó')
+    ax.fill(angles, promedios_choco, color='red', alpha=0.25)
 
-# Crear gráfico de radar para Bogotá
-ax.plot(angles, promedios_bogota, color='green', linewidth=2, linestyle='solid', label='Bogotá')
-ax.fill(angles, promedios_bogota, color='green', alpha=0.25)
+    ax.set_yticklabels([])
+    ax.set_xticks(angles[:-1])
+    ax.set_xticklabels(nuevas_etiquetas, fontsize=10, color='black', fontweight='bold')
 
-# Crear gráfico de radar para Chocó
-ax.plot(angles, promedios_choco, color='red', linewidth=2, linestyle='solid', label='Chocó')
-ax.fill(angles, promedios_choco, color='red', alpha=0.25)
+    ax.set_title('Comparación Normalizada entre Bogotá y Chocó', fontsize=12, color='black', fontweight='bold', y=1.1)
+    ax.legend(loc='upper right', bbox_to_anchor=(1.3, 1), fontsize=10, frameon=True, shadow=True, fancybox=True)
 
-# Añadir etiquetas
-ax.set_yticklabels([])
-ax.set_xticks(angles[:-1])
-ax.set_xticklabels(nuevas_etiquetas, fontsize=10, color='black', fontweight='bold')
+    plt.tight_layout()
+    st.pyplot(fig)
 
-ax.set_title('Comparación Normalizada entre Bogotá y Chocó', fontsize=12, color='black', fontweight='bold', y=1.1)
-ax.legend(loc='upper right', bbox_to_anchor=(1.3, 1), fontsize=10, frameon=True, shadow=True, fancybox=True)
+# Función para mostrar gráfico de barras
+def mostrar_barras(df):
+    puntaje_columnas = ['PUNT_GLOBAL']
 
-plt.tight_layout()
+    df_agrupado = df.groupby('ESTU_DEPTO_RESIDE')[puntaje_columnas].mean().reset_index()
 
-# Mostrar gráfico de radar
-st.pyplot(fig)
+    df_agrupado = df_agrupado[df_agrupado['ESTU_DEPTO_RESIDE'].isin(['BOGOTÁ', 'CHOCO'])]
+    df_agrupado['ESTU_DEPTO_RESIDE'] = df_agrupado['ESTU_DEPTO_RESIDE'].replace({'BOGOTÁ': 'Bogotá', 'CHOCO': 'Chocó'})
 
-# Mapa
-st.header('Mapa de Puntajes Promedio por Departamento')
+    sns.set(style="whitegrid")
+    plt.figure(figsize=(14, 8))
 
-# Coordenadas de los departamentos
-coordenadas = {
-    'ANTIOQUIA': (6.702032125, -75.50455704),
-    'ATLANTICO': (10.67700953, -74.96521949),
-    'BOGOTÁ': (4.316107698, -74.1810727),
-    # Añadir las demás coordenadas...
-}
+    df_agrupado = df_agrupado.sort_values(by='PUNT_GLOBAL', ascending=False)
 
-# Promedios por departamento
-df_mapa = df[['ESTU_DEPTO_RESIDE', 'PUNT_GLOBAL']]
-promedios = df_mapa.groupby('ESTU_DEPTO_RESIDE')['PUNT_GLOBAL'].mean().reset_index()
-promedios.rename(columns={'PUNT_GLOBAL': 'PROMEDIO_PUNT_GLOBAL'}, inplace=True)
+    custom_palette = {'Bogotá': '#006400', 'Chocó': '#8B0000'}
 
-promedios['LATITUD'] = promedios['ESTU_DEPTO_RESIDE'].map(lambda x: coordenadas[x][0] if x in coordenadas else None)
-promedios['LONGITUD'] = promedios['ESTU_DEPTO_RESIDE'].map(lambda x: coordenadas[x][1] if x in coordenadas else None)
+    bar_plot = sns.barplot(data=df_agrupado, y='ESTU_DEPTO_RESIDE', x='PUNT_GLOBAL', palette=custom_palette)
 
-# Crear mapa
-mapa = folium.Map(location=[4.5709, -74.2973], zoom_start=5, control_scale=True)
+    plt.title('Comparativa del Puntaje Global por Departamento', fontsize=18, weight='bold', color='black')
+    plt.xlabel('Media del Puntaje Global', fontsize=16, fontweight='bold')
+    plt.ylabel('Departamento', fontsize=16, fontweight='bold')
 
-# Función para asignar colores según puntaje
-def get_color(puntaje):
-    if puntaje >= promedios['PROMEDIO_PUNT_GLOBAL'].max() - 0.1:
-        return 'red'
-    elif puntaje >= promedios['PROMEDIO_PUNT_GLOBAL'].min() + 0.1:
-        return 'orange'
-    else:
-        return 'blue'
+    bar_plot.set_yticklabels(bar_plot.get_yticklabels(), fontsize=16, fontweight='bold', color='black')
 
-# Añadir los puntos al mapa
-for _, row in promedios.iterrows():
-    folium.CircleMarker(
-        location=[row['LATITUD'], row['LONGITUD']],
-        radius=10,
-        color=get_color(row['PROMEDIO_PUNT_GLOBAL']),
-        fill=True,
-        fill_color=get_color(row['PROMEDIO_PUNT_GLOBAL']),
-        fill_opacity=0.6
-    ).add_to(mapa)
+    for p in bar_plot.patches:
+        value = round(p.get_width())
+        bar_plot.annotate(f'{value}', 
+                          (p.get_width() / 2, p.get_y() + p.get_height() / 2.), 
+                          ha='center', va='center', fontsize=16, fontweight='bold', color='white')
 
-# Mostrar mapa en Streamlit
-st.write(mapa)
+    plt.tight_layout()
+    st.pyplot(fig)
+
+# Función para mostrar el mapa
+def mostrar_mapa(promedios):
+    mapa = folium.Map(location=[4.5709, -74.2973], zoom_start=5, control_scale=True)
+
+    min_puntaje = promedios['PROMEDIO_PUNT_GLOBAL'].min()
+    max_puntaje = promedios['PROMEDIO_PUNT_GLOBAL'].max()
+
+    def get_color(puntaje):
+        rango = max_puntaje - min_puntaje
+        if puntaje >= min_puntaje + 0.67 * rango:
+            return 'red'
+        elif puntaje >= min_puntaje + 0.33 * rango:
+            return 'orange'
+        else:
+            return 'blue'
+
+    for index, row in promedios.iterrows():
+        color = get_color(row['PROMEDIO_PUNT_GLOBAL'])
+
+        folium.CircleMarker(
+            location=[row['LATITUD'], row['LONGITUD']],
+            radius=10,
+            color=color,
+            fill=True,
+            fill_color=color,
+            fill_opacity=0.7,
+            popup=f"{row['DEPTO']} - Promedio Puntaje Global: {row['PROMEDIO_PUNT_GLOBAL']}",
+        ).add_to(mapa)
+
+    st.markdown('### Mapa de Puntajes por Departamento')
+    st.components.v1.html(mapa._repr_html_(), height=600)
+
+# Configuración de la aplicación
+st.title('Análisis de Datos de Estudiantes')
+
+# Mostrar gráficas
+st.subheader('Gráfico Radar')
+df_radar = procesar_datos_radar(df)
+mostrar_radar(df_radar)
+
+st.subheader('Gráfico de Barras del Puntaje Global')
+mostrar_barras(df)
+
+st.subheader('Mapa de Puntajes por Departamento')
+promedios = df.groupby(['DEPTO', 'LATITUD', 'LONGITUD'])['PUNT_GLOBAL'].mean().reset_index()
+mostrar_mapa(promedios)
