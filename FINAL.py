@@ -1,11 +1,12 @@
 import pandas as pd
-import seaborn as sns
+import numpy as np
 import matplotlib.pyplot as plt
+import seaborn as sns
 import streamlit as st
 import os
 
 # Definir la ruta del archivo Parquet
-file_path = 'DatosParquet_reducido.parquet'  # Cambiado a ruta relativa
+file_path = 'DatosParquet_reducido.parquet'
 
 # Configuración de estilo
 st.set_page_config(page_title="Dashboard de Puntajes y Estratos", layout="wide")
@@ -48,7 +49,7 @@ if os.path.exists(file_path):
     df_filtrado_puntaje = df_agrupado_puntajes[df_agrupado_puntajes['ESTU_DEPTO_RESIDE'].isin(selected_departamentos)]
     df_filtrado_estrato = df_agrupado_estrato[df_agrupado_estrato['ESTU_DEPTO_RESIDE'].isin(selected_departamentos)]
 
-    # Dashboard: Gráficos organizados en columnas
+    # Gráficos organizados en columnas
     col1, col2 = st.columns(2)
 
     # Gráfico de puntajes (ejes X e Y invertidos)
@@ -87,28 +88,64 @@ if os.path.exists(file_path):
         else:
             st.warning("No hay datos disponibles para los departamentos seleccionados en el gráfico de estratos.")
 
-    # Fila completa para gráfico de burbujas
-    st.subheader(f'Relación entre {selected_puntaje}, Estrato y Departamento')
-    if not df_filtrado_puntaje.empty and not df_filtrado_estrato.empty:
-        df_combined = pd.merge(df_filtrado_puntaje, df_filtrado_estrato, on='ESTU_DEPTO_RESIDE')
-        plt.figure(figsize=(14, 8))
-        scatter_plot = sns.scatterplot(
-            data=df_combined, 
-            y='ESTU_DEPTO_RESIDE', 
-            x=selected_puntaje, 
-            size='FAMI_ESTRATOVIVIENDA', 
-            sizes=(20, 200), 
-            hue='FAMI_ESTRATOVIVIENDA', 
-            palette='coolwarm', 
-            legend="brief"
-        )
-        plt.title(f'Relación entre {selected_puntaje}, Estrato de Vivienda y Departamento', fontsize=16)
-        plt.ylabel('Departamento', fontsize=14)
-        plt.xlabel(f'Media de {selected_puntaje}', fontsize=14)
-        plt.xticks(rotation=0)
-        st.pyplot(plt)
-        plt.close()
-    else:
-        st.warning("No hay datos suficientes para mostrar el gráfico de relación entre puntaje, estrato y departamento.")
+    # Gráfico de radar interactivo
+    st.subheader(f'Comparación Normalizada entre Departamentos seleccionados')
+
+    # Filtrar el DataFrame según los departamentos seleccionados
+    df_radar = df_filtrado[df_filtrado['ESTU_DEPTO_RESIDE'].isin(selected_departamentos)]
+
+    # Normalizar las columnas para el radar
+    df_radar_normalizado = df_radar.copy()
+    columnas_a_normalizar = ['FAMI_ESTRATOVIVIENDA', 'FAMI_EDUCACIONPADRE', 'FAMI_EDUCACIONMADRE', 
+                             'FAMI_TIENEINTERNET', 'FAMI_TIENECOMPUTADOR', 'FAMI_NUMLIBROS']
+
+    for columna in columnas_a_normalizar:
+        min_val = df_radar_normalizado[columna].min()
+        max_val = df_radar_normalizado[columna].max()
+        df_radar_normalizado[columna] = (df_radar_normalizado[columna] - min_val) / (max_val - min_val)
+
+    # Crear una lista de etiquetas
+    nuevas_etiquetas = [
+        'Estrato de Vivienda', 
+        'Nivel Educativo del Padre', 
+        'Nivel Educativo de la Madre', 
+        'Acceso a Internet', 
+        'Disponibilidad de Computadora', 
+        'Número de Libros del Hogar'
+    ]
+
+    # Preparar los datos para la gráfica de radar
+    promedios_departamentos = {}
+    for depto in selected_departamentos:
+        depto_data = df_radar_normalizado[df_radar_normalizado['ESTU_DEPTO_RESIDE'] == depto]
+        promedios_departamentos[depto] = depto_data[columnas_a_normalizar].mean().tolist()
+
+    # Número de categorías
+    num_vars = len(nuevas_etiquetas)
+    angles = np.linspace(0, 2 * np.pi, num_vars, endpoint=False).tolist()
+    angles += angles[:1]  # Cerrar el gráfico
+
+    # Crear la figura y los ejes
+    fig, ax = plt.subplots(figsize=(7, 7), dpi=100, subplot_kw=dict(polar=True))
+
+    for depto, promedios in promedios_departamentos.items():
+        promedios += promedios[:1]
+        ax.plot(angles, promedios, label=depto, linewidth=2, linestyle='solid')
+        ax.fill(angles, promedios, alpha=0.25)
+
+    # Añadir etiquetas con letras negras
+    ax.set_yticklabels([])
+    ax.set_xticks(angles[:-1])
+    ax.set_xticklabels(nuevas_etiquetas, fontsize=10, color='black', fontweight='bold')
+
+    # Título y leyenda
+    ax.set_title(f'Comparación Normalizada entre Departamentos', fontsize=12, color='black', fontweight='bold', y=1.1)
+    ax.legend(loc='upper right', bbox_to_anchor=(1.3, 1), fontsize=10, frameon=True, shadow=True, fancybox=True)
+
+    # Ajustar el diseño para evitar recortes
+    plt.tight_layout()
+    st.pyplot(plt)
+    plt.close()
+
 else:
-    st.error("No se encontró el archivo de datos. Asegúrate de que esté en el directorio correcto.")
+    st.error(f"El archivo {file_path} no se encuentra en el directorio.")
