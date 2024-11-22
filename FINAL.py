@@ -64,6 +64,16 @@ if os.path.exists(file_path):
                 bar_plot.annotate(f'{p.get_width():.1f}', (p.get_width(), p.get_y() + p.get_height() / 2.), ha='center', va='center', fontsize=8, color='black')
             st.pyplot(plt)
             plt.close()
+
+            # Obtener el mejor y peor puntaje
+            mejor_departamento = df_filtrado_puntaje.loc[df_filtrado_puntaje[selected_puntaje].idxmax()]
+            peor_departamento = df_filtrado_puntaje.loc[df_filtrado_puntaje[selected_puntaje].idxmin()]
+
+            # Mostrar el mejor y peor puntaje
+            st.write(f"**Mejor Puntaje:**")
+            st.write(f"Departamento: {mejor_departamento['ESTU_DEPTO_RESIDE']}, Puntaje: {mejor_departamento[selected_puntaje]:.2f}")
+            st.write(f"**Peor Puntaje:**")
+            st.write(f"Departamento: {peor_departamento['ESTU_DEPTO_RESIDE']}, Puntaje: {peor_departamento[selected_puntaje]:.2f}")
         else:
             st.warning("No hay departamentos seleccionados para mostrar el gráfico de puntajes.")
 else:
