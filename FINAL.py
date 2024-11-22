@@ -1,9 +1,10 @@
 import pandas as pd
-import seaborn as sns
+import numpy as np
 import matplotlib.pyplot as plt
+import seaborn as sns
 import streamlit as st
 import os
-import numpy as np
+from math import pi
 
 # Definir la ruta del archivo Parquet
 file_path = 'DatosParquet_reducido.parquet'  # Cambiado a ruta relativa
@@ -111,65 +112,73 @@ if os.path.exists(file_path):
         plt.close()
     else:
         st.warning("No hay datos suficientes para mostrar el gráfico de relación entre puntaje, estrato y departamento.")
-        
-    # Gráfico de radar (Interacción con filtros)
-    st.subheader(f'Comparación Normalizada entre Departamentos')
 
-    # Filtrar las columnas que existen en df_radar_normalizado
-    columnas_a_normalizar = ['FAMI_ESTRATOVIVIENDA', 'FAMI_EDUCACIONPADRE', 'FAMI_EDUCACIONMADRE', 
-                             'FAMI_TIENEINTERNET', 'FAMI_TIENECOMPUTADOR', 'FAMI_NUMLIBROS']
+    # Preparar datos para el gráfico radar
+    columnas_radar = ['ESTU_DEPTO_RESIDE', 'FAMI_ESTRATOVIVIENDA', 'FAMI_EDUCACIONPADRE', 'FAMI_EDUCACIONMADRE', 
+                      'FAMI_TIENEINTERNET', 'FAMI_TIENECOMPUTADOR', 'FAMI_NUMLIBROS', 'PUNT_GLOBAL']
+    df_radar = df[columnas_radar]
 
-    # Filtrar las columnas que existen en df_radar_normalizado
-    columnas_existentes = [col for col in columnas_a_normalizar if col in df.columns]
+    # Preprocesar los datos de las columnas de radar
+    estrato_mapping_radar = {
+        "Sin Estrato": None,
+        "Estrato 1": 1,
+        "Estrato 2": 2,
+        "Estrato 3": 3,
+        "Estrato 4": 4,
+        "Estrato 5": 5,
+        "Estrato 6": 6
+    }
+    df_radar['FAMI_ESTRATOVIVIENDA'] = df_radar['FAMI_ESTRATOVIVIENDA'].map(estrato_mapping_radar)
 
-    # Normalizar solo las columnas que existen
-    df_radar_normalizado = df[["ESTU_DEPTO_RESIDE"] + columnas_existentes].copy()
+    # Diccionario de niveles de educación
+    orden_educacion = [
+        ('Postgrado', 13),
+        ('Educación profesional completa', 12),
+        ('Educación profesional incompleta', 11),
+        ('Técnica o tecnológica completa', 10),
+        ('Secundaria (Bachillerato) completa', 9),
+        ('Primaria completa', 8),
+        ('Técnica o tecnológica incompleta', 7),
+        ('Secundaria (Bachillerato) incompleta', 6),
+        ('Primaria incompleta', 5),
+        ('Ninguno', 4),
+        ('No Aplica', 3),
+        ('No sabe', 2),
+        (None, 1)
+    ]
+    diccionario_educacion = dict(orden_educacion)
+
+    # Reemplazar educación
+    df_radar['FAMI_EDUCACIONPADRE'] = df_radar['FAMI_EDUCACIONPADRE'].replace(diccionario_educacion)
+    df_radar['FAMI_EDUCACIONMADRE'] = df_radar['FAMI_EDUCACIONMADRE'].replace(diccionario_educacion)
+
+    # Convertir a numérico FAMI_TIENEINTERNET y FAMI_TIENECOMPUTADOR
+    df_radar['FAMI_TIENEINTERNET'] = df_radar['FAMI_TIENEINTERNET'].apply(lambda x: 1 if x == 'Si' else 0)
+    df_radar['FAMI_TIENECOMPUTADOR'] = df_radar['FAMI_TIENECOMPUTADOR'].apply(lambda x: 1 if x == 'Si' else 0)
+
+    # Normalización de datos
+    columnas_existentes = [col for col in df_radar.columns if col != 'ESTU_DEPTO_RESIDE']
+    df_radar_normalizado = df_radar[["ESTU_DEPTO_RESIDE"] + columnas_existentes].copy()
+
+    # Asegurar que las columnas sean numéricas y eliminar NaN
+    for columna in columnas_existentes:
+        if df_radar_normalizado[columna].dtype not in ['float64', 'int64']:
+            df_radar_normalizado[columna] = pd.to_numeric(df_radar_normalizado[columna], errors='coerce')
+    df_radar_normalizado = df_radar_normalizado.dropna(subset=columnas_existentes)
+
+    # Normalizar las columnas
     for columna in columnas_existentes:
         min_val = df_radar_normalizado[columna].min()
         max_val = df_radar_normalizado[columna].max()
-        df_radar_normalizado[columna] = (df_radar_normalizado[columna] - min_val) / (max_val - min_val)
+        if max_val != min_val:
+            df_radar_normalizado[columna] = (df_radar_normalizado[columna] - min_val) / (max_val - min_val)
+        else:
+            df_radar_normalizado[columna] = 0
 
-    # Crear una lista de etiquetas
-    nuevas_etiquetas = [
-        'Estrato de Vivienda', 
-        'Nivel Educativo del Padre', 
-        'Nivel Educativo de la Madre', 
-        'Acceso a Internet', 
-        'Disponibilidad de Computadora', 
-        'Número de Libros del Hogar'
-    ]
-
-    # Preparar los datos para la gráfica de radar
-    promedios_departamentos = {}
-    for depto in selected_departamentos:
-        depto_data = df_radar_normalizado[df_radar_normalizado['ESTU_DEPTO_RESIDE'] == depto]
-        promedios_departamentos[depto] = depto_data[columnas_existentes].mean().tolist()
-
-    # Número de categorías
-    num_vars = len(nuevas_etiquetas)
-    angles = np.linspace(0, 2 * np.pi, num_vars, endpoint=False).tolist()
-    angles += angles[:1]  # Cerrar el gráfico
-
-    # Crear la figura y los ejes
-    fig, ax = plt.subplots(figsize=(7, 7), dpi=100, subplot_kw=dict(polar=True))
-
-    for depto, promedios in promedios_departamentos.items():
-        promedios += promedios[:1]
-        ax.plot(angles, promedios, label=depto, linewidth=2, linestyle='solid')
-        ax.fill(angles, promedios, alpha=0.25)
-
-    # Añadir etiquetas con letras negras
-    ax.set_yticklabels([])
-    ax.set_xticks(angles[:-1])
-    ax.set_xticklabels(nuevas_etiquetas, fontsize=10, color='black', fontweight='bold')
-
-    # Título y leyenda
-    ax.set_title(f'Comparación Normalizada entre Departamentos', fontsize=12, color='black', fontweight='bold', y=1.1)
-    ax.legend(loc='upper right', bbox_to_anchor=(1.3, 1), fontsize=10, frameon=True, shadow=True, fancybox=True)
-
-    # Ajustar el diseño para evitar recortes
-    plt.tight_layout()
-    st.pyplot(plt)
-    plt.close()
+    # Código para mostrar gráfico radar
+    st.subheader('Gráfico Radar de Puntajes y Características')
+    if not df_radar_normalizado.empty:
+        # Agregar aquí el código del gráfico radar que prefieras.
+        st.write("Gráfico radar se debe agregar aquí.")
 else:
-    st.error("El archivo de datos no se encontró. Por favor, revisa el archivo y vuelve a intentarlo.")
+    st.error("El archivo no existe. Por favor, verifica la ubicación del archivo Parquet.")
