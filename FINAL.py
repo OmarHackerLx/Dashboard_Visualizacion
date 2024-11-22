@@ -1,12 +1,12 @@
 import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
 import seaborn as sns
+import matplotlib.pyplot as plt
 import streamlit as st
 import os
+import numpy as np
 
 # Definir la ruta del archivo Parquet
-file_path = 'DatosParquet_reducido.parquet'
+file_path = 'DatosParquet_reducido.parquet'  # Cambiado a ruta relativa
 
 # Configuración de estilo
 st.set_page_config(page_title="Dashboard de Puntajes y Estratos", layout="wide")
@@ -49,7 +49,7 @@ if os.path.exists(file_path):
     df_filtrado_puntaje = df_agrupado_puntajes[df_agrupado_puntajes['ESTU_DEPTO_RESIDE'].isin(selected_departamentos)]
     df_filtrado_estrato = df_agrupado_estrato[df_agrupado_estrato['ESTU_DEPTO_RESIDE'].isin(selected_departamentos)]
 
-    # Gráficos organizados en columnas
+    # Dashboard: Gráficos organizados en columnas
     col1, col2 = st.columns(2)
 
     # Gráfico de puntajes (ejes X e Y invertidos)
@@ -88,18 +88,43 @@ if os.path.exists(file_path):
         else:
             st.warning("No hay datos disponibles para los departamentos seleccionados en el gráfico de estratos.")
 
-    # Gráfico de radar interactivo
-    st.subheader(f'Comparación Normalizada entre Departamentos seleccionados')
+    # Fila completa para gráfico de burbujas
+    st.subheader(f'Relación entre {selected_puntaje}, Estrato y Departamento')
+    if not df_filtrado_puntaje.empty and not df_filtrado_estrato.empty:
+        df_combined = pd.merge(df_filtrado_puntaje, df_filtrado_estrato, on='ESTU_DEPTO_RESIDE')
+        plt.figure(figsize=(14, 8))
+        scatter_plot = sns.scatterplot(
+            data=df_combined, 
+            y='ESTU_DEPTO_RESIDE', 
+            x=selected_puntaje, 
+            size='FAMI_ESTRATOVIVIENDA', 
+            sizes=(20, 200), 
+            hue='FAMI_ESTRATOVIVIENDA', 
+            palette='coolwarm', 
+            legend="brief"
+        )
+        plt.title(f'Relación entre {selected_puntaje}, Estrato de Vivienda y Departamento', fontsize=16)
+        plt.ylabel('Departamento', fontsize=14)
+        plt.xlabel(f'Media de {selected_puntaje}', fontsize=14)
+        plt.xticks(rotation=0)
+        st.pyplot(plt)
+        plt.close()
+    else:
+        st.warning("No hay datos suficientes para mostrar el gráfico de relación entre puntaje, estrato y departamento.")
+        
+    # Gráfico de radar (Interacción con filtros)
+    st.subheader(f'Comparación Normalizada entre Departamentos')
 
-    # Filtrar el DataFrame según los departamentos seleccionados
-    df_radar = df_filtrado[df_filtrado['ESTU_DEPTO_RESIDE'].isin(selected_departamentos)]
-
-    # Normalizar las columnas para el radar
-    df_radar_normalizado = df_radar.copy()
+    # Filtrar las columnas que existen en df_radar_normalizado
     columnas_a_normalizar = ['FAMI_ESTRATOVIVIENDA', 'FAMI_EDUCACIONPADRE', 'FAMI_EDUCACIONMADRE', 
                              'FAMI_TIENEINTERNET', 'FAMI_TIENECOMPUTADOR', 'FAMI_NUMLIBROS']
 
-    for columna in columnas_a_normalizar:
+    # Filtrar las columnas que existen en df_radar_normalizado
+    columnas_existentes = [col for col in columnas_a_normalizar if col in df.columns]
+
+    # Normalizar solo las columnas que existen
+    df_radar_normalizado = df[["ESTU_DEPTO_RESIDE"] + columnas_existentes].copy()
+    for columna in columnas_existentes:
         min_val = df_radar_normalizado[columna].min()
         max_val = df_radar_normalizado[columna].max()
         df_radar_normalizado[columna] = (df_radar_normalizado[columna] - min_val) / (max_val - min_val)
@@ -118,7 +143,7 @@ if os.path.exists(file_path):
     promedios_departamentos = {}
     for depto in selected_departamentos:
         depto_data = df_radar_normalizado[df_radar_normalizado['ESTU_DEPTO_RESIDE'] == depto]
-        promedios_departamentos[depto] = depto_data[columnas_a_normalizar].mean().tolist()
+        promedios_departamentos[depto] = depto_data[columnas_existentes].mean().tolist()
 
     # Número de categorías
     num_vars = len(nuevas_etiquetas)
@@ -146,6 +171,5 @@ if os.path.exists(file_path):
     plt.tight_layout()
     st.pyplot(plt)
     plt.close()
-
 else:
-    st.error(f"El archivo {file_path} no se encuentra en el directorio.")
+    st.error("El archivo de datos no se encontró. Por favor, revisa el archivo y vuelve a intentarlo.")
