@@ -1,114 +1,155 @@
-import pandas as pd
-import seaborn as sns
-import matplotlib.pyplot as plt
 import streamlit as st
-import os
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+import folium
+from math import pi
+from sklearn.preprocessing import MinMaxScaler
 
-# Definir la ruta del archivo Parquet
-file_path = 'DatosParquet_reducido.parquet'  # Cambiado a ruta relativa
+# Cargar el DataFrame
+df = pd.read_parquet('DatosParquet.parquet')
 
-# Configuración de estilo
-st.set_page_config(page_title="Dashboard de Puntajes y Estratos", layout="wide")
-st.title('Dashboard de Puntajes y Estratos por Departamento')
+# Preprocesamiento de los datos
+df_radar = df[['ESTU_DEPTO_RESIDE', 'FAMI_ESTRATOVIVIENDA', 'FAMI_EDUCACIONPADRE', 'FAMI_EDUCACIONMADRE', 
+               'FAMI_TIENEINTERNET', 'FAMI_TIENECOMPUTADOR', 'FAMI_NUMLIBROS', 'PUNT_GLOBAL']]
 
-# Verificar si el archivo Parquet existe
-if os.path.exists(file_path):
-    # Cargar el archivo Parquet
-    df = pd.read_parquet(file_path)
+# Limpieza de datos
+df_radar['FAMI_ESTRATOVIVIENDA'] = df_radar['FAMI_ESTRATOVIVIENDA'].replace({'Sin Estrato': None}).str.replace('Estrato ', '', regex=False).astype(float)
+diccionario_educacion = {
+    'Postgrado': 13, 'Educación profesional completa': 12, 'Educación profesional incompleta': 11,
+    'Técnica o tecnológica completa': 10, 'Secundaria (Bachillerato) completa': 9, 'Primaria completa': 8,
+    'Técnica o tecnológica incompleta': 7, 'Secundaria (Bachillerato) incompleta': 6, 'Primaria incompleta': 5,
+    'Ninguno': 4, 'No Aplica': 3, 'No sabe': 2, None: 1
+}
+df_radar['FAMI_EDUCACIONPADRE'] = df_radar['FAMI_EDUCACIONPADRE'].replace(diccionario_educacion)
+df_radar['FAMI_EDUCACIONMADRE'] = df_radar['FAMI_EDUCACIONMADRE'].replace(diccionario_educacion)
+df_radar['FAMI_TIENEINTERNET'] = df_radar['FAMI_TIENEINTERNET'].replace({'Sí': 1, 'No': 0, 'Si': 1}).astype(float)
+df_radar['FAMI_TIENECOMPUTADOR'] = df_radar['FAMI_TIENECOMPUTADOR'].replace({'Sí': 1, 'No': 0, 'Si': 1}).astype(float)
+df_radar['FAMI_NUMLIBROS'] = df_radar['FAMI_NUMLIBROS'].replace({'MÁS DE 100 LIBROS': 5, '26 A 100 LIBROS': 4, 
+                                                                  '11 A 25 LIBROS': 3, '0 A 10 LIBROS': 2, None: 1}).astype(float)
 
-    # Filtrar los datos eliminando valores nulos en 'ESTU_DEPTO_RESIDE'
-    df_filtrado = df.dropna(subset=['ESTU_DEPTO_RESIDE'])
+# Filtrar los datos para el mapa
+df_mapa = df[['ESTU_DEPTO_RESIDE', 'PUNT_GLOBAL']]
+df_mapa = df_mapa[~df_mapa['ESTU_DEPTO_RESIDE'].isin(['EXTRANJERO', None])]
+promedios = df_mapa.groupby('ESTU_DEPTO_RESIDE')['PUNT_GLOBAL'].mean().reset_index()
+promedios.rename(columns={'PUNT_GLOBAL': 'PROMEDIO_PUNT_GLOBAL'}, inplace=True)
 
-    # Crear un diccionario para mapear los valores de estratos a números
-    estrato_mapping = {
-        "Sin Estrato": None,
-        "Estrato 1": 1,
-        "Estrato 2": 2,
-        "Estrato 3": 3,
-        "Estrato 4": 4,
-        "Estrato 5": 5,
-        "Estrato 6": 6
-    }
+# Añadir las coordenadas de los departamentos
+coordenadas = {
+    'ANTIOQUIA': (6.702032125, -75.50455704), 'ATLANTICO': (10.67700953, -74.96521949), 'BOGOTÁ': (4.316107698, -74.1810727),
+    'BOLIVAR': (8.079796863, -74.23514814), 'BOYACA': (5.891672889, -72.62788054), 'CALDAS': (5.280139978, -75.27498304),
+    'CAQUETA': (0.798556195, -73.95946756), 'CAUCA': (2.396833887, -76.82423283), 'CESAR': (9.53665993, -73.51783154),
+    'CORDOBA': (8.358549754, -75.79200872), 'CUNDINAMARCA': (4.771120716, -74.43111092), 'CHOCO': (5.397581542, -76.942811),
+    'HUILA': (2.570143029, -75.58434836), 'LA GUAJIRA': (11.47687008, -72.42951072), 'MAGDALENA': (10.24738355, -74.26175733),
+    'META': (3.345562732, -72.95645988), 'NARIÑO': (1.571094987, -77.87020496), 'NORTE SANTANDER': (8.09513751, -72.88188297),
+    'QUINDIO': (4.455241567, -75.68962853), 'RISARALDA': (5.240757239, -76.00244469), 'SANTANDER': (6.693633184, -73.48600894),
+    'SUCRE': (9.064941448, -75.10981755), 'TOLIMA': (4.03477252, -75.2558271), 'VALLE': (3.569858693, -76.62850427),
+    'ARAUCA': (6.569577215, -70.96732394), 'CASANARE': (5.404064237, -71.60188073), 'PUTUMAYO': (0.3673031, -75.51406183),
+    'SAN ANDRES': (12.54311512, -81.71762382), 'AMAZONAS': (-1.54622768, -71.50212858), 'GUAINIA': (2.727842865, -68.81661272),
+    'GUAVIARE': (1.924531973, -72.12859569), 'VAUPES': (0.64624561, -70.56140566), 'VICHADA': (4.713557125, -69.41400011)
+}
 
-    # Reemplazar los valores de la columna 'FAMI_ESTRATOVIVIENDA' por valores numéricos
-    df_filtrado['FAMI_ESTRATOVIVIENDA'] = df_filtrado['FAMI_ESTRATOVIVIENDA'].map(estrato_mapping)
+promedios['LATITUD'] = promedios['ESTU_DEPTO_RESIDE'].map(lambda x: coordenadas[x][0] if x in coordenadas else None)
+promedios['LONGITUD'] = promedios['ESTU_DEPTO_RESIDE'].map(lambda x: coordenadas[x][1] if x in coordenadas else None)
 
-    # Sidebar: Selección de puntaje y departamentos
-    st.sidebar.header('Filtros del Dashboard')
-    puntajes_columnas = ['PUNT_LECTURA_CRITICA', 'PUNT_MATEMATICAS', 'PUNT_C_NATURALES', 
-                         'PUNT_SOCIALES_CIUDADANAS', 'PUNT_INGLES', 'PUNT_GLOBAL']
-    selected_puntaje = st.sidebar.radio('Selecciona el puntaje a visualizar:', puntajes_columnas)
+# Normalizar los datos para el radar
+df_radar_normalizado = df_radar.copy()
+scaler = MinMaxScaler()
+df_radar_normalizado[['FAMI_ESTRATOVIVIENDA', 'FAMI_EDUCACIONPADRE', 'FAMI_EDUCACIONMADRE',
+                      'FAMI_TIENEINTERNET', 'FAMI_TIENECOMPUTADOR', 'FAMI_NUMLIBROS']] = scaler.fit_transform(
+    df_radar[['FAMI_ESTRATOVIVIENDA', 'FAMI_EDUCACIONPADRE', 'FAMI_EDUCACIONMADRE',
+              'FAMI_TIENEINTERNET', 'FAMI_TIENECOMPUTADOR', 'FAMI_NUMLIBROS']])
 
-    # Agrupaciones y filtrado
-    df_agrupado_puntajes = df.groupby('ESTU_DEPTO_RESIDE')[puntajes_columnas].mean().reset_index()
-    df_agrupado_estrato = df_filtrado.dropna(subset=['FAMI_ESTRATOVIVIENDA']).groupby('ESTU_DEPTO_RESIDE')['FAMI_ESTRATOVIVIENDA'].mean().reset_index()
-    departamentos = df_agrupado_puntajes['ESTU_DEPTO_RESIDE'].unique()
-    selected_departamentos = st.sidebar.multiselect('Selecciona los departamentos:', options=departamentos, default=departamentos)
+# Streamlit - Filtros
+st.title("Análisis Interactivo de Datos")
+departamento_seleccionado = st.selectbox('Selecciona un Departamento', df['ESTU_DEPTO_RESIDE'].unique())
+filtro_estrato = st.slider('Filtro de Estrato', 1, 6, (1, 6))
 
-    df_filtrado_puntaje = df_agrupado_puntajes[df_agrupado_puntajes['ESTU_DEPTO_RESIDE'].isin(selected_departamentos)]
-    df_filtrado_estrato = df_agrupado_estrato[df_agrupado_estrato['ESTU_DEPTO_RESIDE'].isin(selected_departamentos)]
+# Filtrar los datos según la selección del usuario
+df_filtrado = df_radar[df_radar['ESTU_DEPTO_RESIDE'] == departamento_seleccionado]
+df_filtrado = df_filtrado[df_filtrado['FAMI_ESTRATOVIVIENDA'].between(filtro_estrato[0], filtro_estrato[1])]
 
-    # Dashboard: Gráficos organizados en columnas
-    col1, col2 = st.columns(2)
+# Gráfico de radar
+def radar_plot():
+    bogota_data = df_radar_normalizado[df_radar_normalizado['ESTU_DEPTO_RESIDE'] == 'BOGOTÁ']
+    choco_data = df_radar_normalizado[df_radar_normalizado['ESTU_DEPTO_RESIDE'] == 'CHOCO']
 
-    # Gráfico de puntajes (ejes X e Y invertidos)
-    with col1:
-        st.subheader(f'Media de {selected_puntaje} por Departamento')
-        if not df_filtrado_puntaje.empty:
-            plt.figure(figsize=(12, 6))
-            df_filtrado_puntaje = df_filtrado_puntaje.sort_values(by=selected_puntaje)
-            bar_plot = sns.barplot(data=df_filtrado_puntaje, y='ESTU_DEPTO_RESIDE', x=selected_puntaje, palette='viridis')
-            plt.title(f'Media del {selected_puntaje} por Departamento', fontsize=16)
-            plt.ylabel('Departamento', fontsize=14)
-            plt.xlabel(f'Media de {selected_puntaje}', fontsize=14)
-            plt.xticks(rotation=0)
-            for p in bar_plot.patches:
-                bar_plot.annotate(f'{p.get_width():.1f}', (p.get_width(), p.get_y() + p.get_height() / 2.), ha='center', va='center', fontsize=8, color='black')
-            st.pyplot(plt)
-            plt.close()
-        else:
-            st.warning("No hay departamentos seleccionados para mostrar el gráfico de puntajes.")
+    promedios_bogota = bogota_data[['FAMI_ESTRATOVIVIENDA', 'FAMI_EDUCACIONPADRE', 'FAMI_EDUCACIONMADRE',
+                                     'FAMI_TIENEINTERNET', 'FAMI_TIENECOMPUTADOR', 'FAMI_NUMLIBROS']].mean().tolist()
+    promedios_choco = choco_data[['FAMI_ESTRATOVIVIENDA', 'FAMI_EDUCACIONPADRE', 'FAMI_EDUCACIONMADRE',
+                                   'FAMI_TIENEINTERNET', 'FAMI_TIENECOMPUTADOR', 'FAMI_NUMLIBROS']].mean().tolist()
 
-    # Gráfico de estratos (ejes X e Y invertidos)
-    with col2:
-        st.subheader('Media de FAMI_ESTRATOVIVIENDA por Departamento')
-        if not df_filtrado_estrato.empty:
-            plt.figure(figsize=(12, 6))
-            df_filtrado_estrato = df_filtrado_estrato.sort_values(by='FAMI_ESTRATOVIVIENDA')
-            bar_plot_estrato = sns.barplot(data=df_filtrado_estrato, y='ESTU_DEPTO_RESIDE', x='FAMI_ESTRATOVIVIENDA', palette='coolwarm')
-            plt.title('Media del Estrato de Vivienda por Departamento', fontsize=16)
-            plt.ylabel('Departamento', fontsize=14)
-            plt.xlabel('Media del Estrato de Vivienda', fontsize=14)
-            plt.xticks(rotation=0)
-            for p in bar_plot_estrato.patches:
-                bar_plot_estrato.annotate(f'{p.get_width():.1f}', (p.get_width(), p.get_y() + p.get_height() / 2.), ha='center', va='center', fontsize=8, color='black')
-            st.pyplot(plt)
-            plt.close()
-        else:
-            st.warning("No hay datos disponibles para los departamentos seleccionados en el gráfico de estratos.")
+    etiquetas = ['Estrato de Vivienda', 'Nivel Educativo del Padre', 'Nivel Educativo de la Madre',
+                 'Acceso a Internet', 'Disponibilidad de Computadora', 'Número de Libros del Hogar']
 
-    # Fila completa para gráfico de burbujas
-    st.subheader(f'Relación entre {selected_puntaje}, Estrato y Departamento')
-    if not df_filtrado_puntaje.empty and not df_filtrado_estrato.empty:
-        df_combined = pd.merge(df_filtrado_puntaje, df_filtrado_estrato, on='ESTU_DEPTO_RESIDE')
-        plt.figure(figsize=(14, 8))
-        scatter_plot = sns.scatterplot(
-            data=df_combined, 
-            y='ESTU_DEPTO_RESIDE', 
-            x=selected_puntaje, 
-            size='FAMI_ESTRATOVIVIENDA', 
-            sizes=(20, 200), 
-            hue='FAMI_ESTRATOVIVIENDA', 
-            palette='coolwarm', 
-            legend="brief"
-        )
-        plt.title(f'Relación entre {selected_puntaje}, Estrato de Vivienda y Departamento', fontsize=16)
-        plt.ylabel('Departamento', fontsize=14)
-        plt.xlabel(f'Media de {selected_puntaje}', fontsize=14)
-        plt.xticks(rotation=0)
-        st.pyplot(plt)
-        plt.close()
-    else:
-        st.warning("No hay datos suficientes para mostrar el gráfico de relación entre puntaje, estrato y departamento.")
-else:
-    st.error("No se encontró el archivo de datos. Asegúrate de que esté en el directorio correcto.")
+    # Crear gráfico de radar
+    num_vars = len(etiquetas)
+    angles = np.linspace(0, 2 * np.pi, num_vars, endpoint=False).tolist()
+    angles += angles[:1]
+    promedios_bogota += promedios_bogota[:1]
+    promedios_choco += promedios_choco[:1]
+
+    fig, ax = plt.subplots(figsize=(7, 7), dpi=100, subplot_kw=dict(polar=True))
+    ax.plot(angles, promedios_bogota, color='green', linewidth=2, linestyle='solid', label='Bogotá')
+    ax.fill(angles, promedios_bogota, color='green', alpha=0.25)
+    ax.plot(angles, promedios_choco, color='red', linewidth=2, linestyle='solid', label='Chocó')
+    ax.fill(angles, promedios_choco, color='red', alpha=0.25)
+
+    ax.set_yticklabels([])
+    ax.set_xticks(angles[:-1])
+    ax.set_xticklabels(etiquetas, fontsize=10, color='black', fontweight='bold')
+    ax.set_title(f'Comparación Normalizada - {departamento_seleccionado}', fontsize=12, color='black', fontweight='bold', y=1.1)
+    ax.legend(loc='upper right', bbox_to_anchor=(1.3, 1), fontsize=10, frameon=True, shadow=True, fancybox=True)
+
+    st.pyplot(fig)
+
+# Gráfico de barras
+def bar_plot():
+    df_agrupado = df.groupby('ESTU_DEPTO_RESIDE')['PUNT_GLOBAL'].mean().reset_index()
+    df_agrupado = df_agrupado[df_agrupado['ESTU_DEPTO_RESIDE'] == departamento_seleccionado]
+    sns.set(style="whitegrid")
+    plt.figure(figsize=(14, 8))
+    sns.barplot(data=df_agrupado, y='ESTU_DEPTO_RESIDE', x='PUNT_GLOBAL', palette="muted")
+    plt.title(f'Comparativa del Puntaje Global - {departamento_seleccionado}', fontsize=18, weight='bold', color='black')
+    plt.xlabel('Media del Puntaje Global', fontsize=16, fontweight='bold')
+    plt.ylabel('Departamento', fontsize=16, fontweight='bold')
+    plt.tight_layout()
+
+    st.pyplot(plt)
+
+# Gráfico de burbuja
+def bubble_plot():
+    df_means = df.groupby('ESTU_DEPTO_RESIDE').agg(
+        media_puntaje=('PUNT_GLOBAL', 'mean'),
+        media_estrato=('FAMI_ESTRATOVIVIENDA', 'mean')
+    ).reset_index()
+
+    plt.figure(figsize=(16, 10))
+    sns.scatterplot(data=df_means, x='media_estrato', y='media_puntaje', size='media_puntaje', hue='ESTU_DEPTO_RESIDE', palette='tab20')
+    plt.title(f'Gráfico de Media de Estrato vs Media de Puntaje por Departamento', fontsize=20)
+    plt.xlabel('Media de Estrato', fontsize=16)
+    plt.ylabel('Media de Puntaje', fontsize=16)
+    st.pyplot(plt)
+
+# Mapa interactivo
+def map_plot():
+    mapa = folium.Map(location=[4.5709, -74.2973], zoom_start=5)
+    for index, row in promedios.iterrows():
+        folium.CircleMarker(
+            location=[row['LATITUD'], row['LONGITUD']],
+            radius=10,
+            color='blue' if row['PROMEDIO_PUNT_GLOBAL'] < 2 else 'orange' if row['PROMEDIO_PUNT_GLOBAL'] < 3 else 'red',
+            fill=True,
+            fill_color='blue' if row['PROMEDIO_PUNT_GLOBAL'] < 2 else 'orange' if row['PROMEDIO_PUNT_GLOBAL'] < 3 else 'red',
+            fill_opacity=0.7,
+            popup=f"{row['ESTU_DEPTO_RESIDE']}: {row['PROMEDIO_PUNT_GLOBAL']}"
+        ).add_to(mapa)
+
+    st.write(mapa)
+
+# Mostrar los gráficos
+radar_plot()
+bar_plot()
+bubble_plot()
+map_plot()
