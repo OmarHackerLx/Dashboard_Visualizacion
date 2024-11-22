@@ -17,3 +17,10 @@ pandas
 folium
 seaborn
 matplotlib
+streamlit
+pandas
+numpy
+matplotlib
+seaborn
+folium
+scikit-learn
