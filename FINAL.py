@@ -1,130 +1,70 @@
 import pandas as pd
-import numpy as np
+import seaborn as sns
 import matplotlib.pyplot as plt
 import streamlit as st
+import os
 
-# Asegúrate de cargar el DataFrame df correctamente. Por ejemplo:
-# df = pd.read_csv('tu_archivo.csv')
+# Definir la ruta del archivo Parquet
+file_path = 'DatosParquet_reducido.parquet'  # Cambiado a ruta relativa
 
-# Verificar si la columna 'PUNT_GLOBAL' existe en el DataFrame
-if 'PUNT_GLOBAL' not in df.columns:
-    st.error("La columna 'PUNT_GLOBAL' no se encuentra en el DataFrame.")
+# Configuración de estilo
+st.set_page_config(page_title="Dashboard de Puntajes", layout="wide")
+st.title('Dashboard de Puntajes por Departamento')
+
+# Verificar si el archivo Parquet existe
+if os.path.exists(file_path):
+    # Cargar el archivo Parquet
+    df = pd.read_parquet(file_path)
+
+    # Filtrar los datos eliminando valores nulos en 'ESTU_DEPTO_RESIDE'
+    df_filtrado = df.dropna(subset=['ESTU_DEPTO_RESIDE'])
+
+    # Crear un diccionario para mapear los valores de estratos a números (no se utilizará)
+    estrato_mapping = {
+        "Sin Estrato": None,
+        "Estrato 1": 1,
+        "Estrato 2": 2,
+        "Estrato 3": 3,
+        "Estrato 4": 4,
+        "Estrato 5": 5,
+        "Estrato 6": 6
+    }
+
+    # Reemplazar los valores de la columna 'FAMI_ESTRATOVIVIENDA' por valores numéricos (no se utilizará)
+    df_filtrado['FAMI_ESTRATOVIVIENDA'] = df_filtrado['FAMI_ESTRATOVIVIENDA'].map(estrato_mapping)
+
+    # Sidebar: Selección de puntaje y departamentos
+    st.sidebar.header('Filtros del Dashboard')
+    puntajes_columnas = ['PUNT_LECTURA_CRITICA', 'PUNT_MATEMATICAS', 'PUNT_C_NATURALES', 
+                         'PUNT_SOCIALES_CIUDADANAS', 'PUNT_INGLES', 'PUNT_GLOBAL']
+    selected_puntaje = st.sidebar.radio('Selecciona el puntaje a visualizar:', puntajes_columnas)
+
+    # Agrupaciones y filtrado
+    df_agrupado_puntajes = df.groupby('ESTU_DEPTO_RESIDE')[puntajes_columnas].mean().reset_index()
+    departamentos = df_agrupado_puntajes['ESTU_DEPTO_RESIDE'].unique()
+    selected_departamentos = st.sidebar.multiselect('Selecciona los departamentos:', options=departamentos, default=departamentos)
+
+    df_filtrado_puntaje = df_agrupado_puntajes[df_agrupado_puntajes['ESTU_DEPTO_RESIDE'].isin(selected_departamentos)]
+
+    # Dashboard: Gráficos organizados en columnas
+    col1 = st.columns(1)[0]
+
+    # Gráfico de puntajes (ejes X e Y invertidos)
+    with col1:
+        st.subheader(f'Media de {selected_puntaje} por Departamento')
+        if not df_filtrado_puntaje.empty:
+            plt.figure(figsize=(12, 6))
+            df_filtrado_puntaje = df_filtrado_puntaje.sort_values(by=selected_puntaje)
+            bar_plot = sns.barplot(data=df_filtrado_puntaje, y='ESTU_DEPTO_RESIDE', x=selected_puntaje, palette='viridis')
+            plt.title(f'Media del {selected_puntaje} por Departamento', fontsize=16)
+            plt.ylabel('Departamento', fontsize=14)
+            plt.xlabel(f'Media de {selected_puntaje}', fontsize=14)
+            plt.xticks(rotation=0)
+            for p in bar_plot.patches:
+                bar_plot.annotate(f'{p.get_width():.1f}', (p.get_width(), p.get_y() + p.get_height() / 2.), ha='center', va='center', fontsize=8, color='black')
+            st.pyplot(plt)
+            plt.close()
+        else:
+            st.warning("No hay departamentos seleccionados para mostrar el gráfico de puntajes.")
 else:
-    # Filtrar el mejor y peor departamento basado en PUNT_GLOBAL
-    mejor_departamento = df.loc[df['PUNT_GLOBAL'].idxmax()]
-    peor_departamento = df.loc[df['PUNT_GLOBAL'].idxmin()]
-
-    # Asegurarnos de que el DataFrame tiene las columnas necesarias
-    columnas_requeridas = ['ESTU_DEPTO_RESIDE', 'FAMI_ESTRATOVIVIENDA', 'FAMI_EDUCACIONPADRE', 
-                           'FAMI_EDUCACIONMADRE', 'FAMI_TIENEINTERNET', 'FAMI_TIENECOMPUTADOR', 
-                           'FAMI_NUMLIBROS', 'PUNT_GLOBAL']
-    
-    columnas_no_encontradas = [col for col in columnas_requeridas if col not in df.columns]
-    if columnas_no_encontradas:
-        st.error(f"Las siguientes columnas no se encuentran en el DataFrame: {', '.join(columnas_no_encontradas)}")
-    else:
-        # Procesamiento de las columnas
-        df_radar = df[columnas_requeridas]
-
-        df_radar['FAMI_ESTRATOVIVIENDA'] = df_radar['FAMI_ESTRATOVIVIENDA'].replace({'Sin Estrato': None}).str.replace('Estrato ', '', regex=False).astype(float)
-
-        # Diccionario de niveles de educación
-        orden_educacion = [
-            ('Postgrado', 13),
-            ('Educación profesional completa', 12),
-            ('Educación profesional incompleta', 11),
-            ('Técnica o tecnológica completa', 10),
-            ('Secundaria (Bachillerato) completa', 9),
-            ('Primaria completa', 8),
-            ('Técnica o tecnológica incompleta', 7),
-            ('Secundaria (Bachillerato) incompleta', 6),
-            ('Primaria incompleta', 5),
-            ('Ninguno', 4),
-            ('No Aplica', 3),
-            ('No sabe', 2),
-            (None, 1)
-        ]
-        diccionario_educacion = dict(orden_educacion)
-
-        df_radar['FAMI_EDUCACIONPADRE'] = df_radar['FAMI_EDUCACIONPADRE'].replace(diccionario_educacion)
-        df_radar['FAMI_EDUCACIONMADRE'] = df_radar['FAMI_EDUCACIONMADRE'].replace(diccionario_educacion)
-
-        df_radar['FAMI_TIENEINTERNET'] = df_radar['FAMI_TIENEINTERNET'].replace({'Sí': 1, 'No': 0, 'Si': 1}).astype(float)
-        df_radar['FAMI_TIENECOMPUTADOR'] = df_radar['FAMI_TIENECOMPUTADOR'].replace({'Sí': 1, 'No': 0, 'Si': 1}).astype(float)
-
-        # Diccionario de niveles de libros
-        orden_libros = [
-            ('MÁS DE 100 LIBROS', 5),
-            ('26 A 100 LIBROS', 4),
-            ('11 A 25 LIBROS', 3),
-            ('0 A 10 LIBROS', 2),
-            (None, 1)
-        ]
-        diccionario_libros = dict(orden_libros)
-        df_radar['FAMI_NUMLIBROS'] = df_radar['FAMI_NUMLIBROS'].replace(diccionario_libros).astype(float)
-
-        # Normalización de las columnas numéricas
-        df_radar_normalizado = df_radar.copy()
-        columnas_a_normalizar = ['FAMI_ESTRATOVIVIENDA', 'FAMI_EDUCACIONPADRE', 'FAMI_EDUCACIONMADRE', 
-                                 'FAMI_TIENEINTERNET', 'FAMI_TIENECOMPUTADOR', 'FAMI_NUMLIBROS']
-
-        for columna in columnas_a_normalizar:
-            min_val = df_radar_normalizado[columna].min()
-            max_val = df_radar_normalizado[columna].max()
-            df_radar_normalizado[columna] = (df_radar_normalizado[columna] - min_val) / (max_val - min_val)
-
-        # Filtrar los datos normalizados para el mejor y peor departamento
-        mejor_departamento_normalizado = df_radar_normalizado[df_radar_normalizado['ESTU_DEPTO_RESIDE'] == mejor_departamento['ESTU_DEPTO_RESIDE']]
-        peor_departamento_normalizado = df_radar_normalizado[df_radar_normalizado['ESTU_DEPTO_RESIDE'] == peor_departamento['ESTU_DEPTO_RESIDE']]
-
-        # Calcular los promedios normalizados
-        promedios_mejor_normalizados = mejor_departamento_normalizado[columnas_a_normalizar].mean()
-        promedios_peor_normalizados = peor_departamento_normalizado[columnas_a_normalizar].mean()
-
-        # Etiquetas para el gráfico de radar
-        nuevas_etiquetas = [
-            'Estrato de Vivienda', 
-            'Nivel Educativo del Padre', 
-            'Nivel Educativo de la Madre', 
-            'Acceso a Internet', 
-            'Disponibilidad de Computadora', 
-            'Número de Libros del Hogar'
-        ]
-
-        # Preparar los datos para el radar
-        promedios_mejor = promedios_mejor_normalizados.tolist()
-        promedios_peor = promedios_peor_normalizados.tolist()
-
-        # Número de categorías
-        num_vars = len(nuevas_etiquetas)
-        angles = np.linspace(0, 2 * np.pi, num_vars, endpoint=False).tolist()
-        angles += angles[:1]  # Cerrar el gráfico
-
-        promedios_mejor += promedios_mejor[:1]
-        promedios_peor += promedios_peor[:1]
-
-        # Crear la figura y los ejes
-        fig, ax = plt.subplots(figsize=(7, 7), dpi=100, subplot_kw=dict(polar=True))
-
-        # Crear gráfico de radar para el mejor departamento
-        ax.plot(angles, promedios_mejor, color='green', linewidth=2, linestyle='solid', label=mejor_departamento['ESTU_DEPTO_RESIDE'])
-        ax.fill(angles, promedios_mejor, color='green', alpha=0.25)
-
-        # Crear gráfico de radar para el peor departamento
-        ax.plot(angles, promedios_peor, color='red', linewidth=2, linestyle='solid', label=peor_departamento['ESTU_DEPTO_RESIDE'])
-        ax.fill(angles, promedios_peor, color='red', alpha=0.25)
-
-        # Añadir etiquetas con letras negras y tamaño 10
-        ax.set_yticklabels([])
-        ax.set_xticks(angles[:-1])
-        ax.set_xticklabels(nuevas_etiquetas, fontsize=10, color='black', fontweight='bold')  # Etiquetas con tamaño 10
-
-        # Título y leyenda con tamaño de letra 10
-        ax.set_title(f'Comparación Normalizada entre {mejor_departamento["ESTU_DEPTO_RESIDE"]} y {peor_departamento["ESTU_DEPTO_RESIDE"]}', fontsize=12, color='black', fontweight='bold', y=1.1)  # Título con tamaño 10
-        ax.legend(loc='upper right', bbox_to_anchor=(1.3, 1), fontsize=10, frameon=True, shadow=True, fancybox=True)  # Leyenda con tamaño 10
-
-        # Ajustar el diseño para evitar recortes
-        plt.tight_layout()
-
-        # Mostrar el gráfico en Streamlit
-        st.pyplot(fig)
+    st.error("No se encontró el archivo de datos. Asegúrate de que esté en el directorio correcto.")
