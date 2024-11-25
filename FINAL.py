@@ -59,7 +59,7 @@ if os.path.exists(file_path):
             peor_departamento = df_filtrado_puntaje.loc[df_filtrado_puntaje[selected_puntaje].idxmin()]
             # Mostrar el mejor y peor puntaje
             st.write(f"**Mejor Puntaje:**")
-            st.write(f"Departamento: {mejor_departamento['ESTU_DEPTO_RESIDE']}, Puntaje: {mejor_departamento[selected_puntaje]:.2f}")
+            st.write(f"Departamento xd: {mejor_departamento['ESTU_DEPTO_RESIDE']}, Puntaje: {mejor_departamento[selected_puntaje]:.2f}")
             st.write(f"**Peor Puntaje:**")
             st.write(f"Departamento: {peor_departamento['ESTU_DEPTO_RESIDE']}, Puntaje: {peor_departamento[selected_puntaje]:.2f}")
         else:
